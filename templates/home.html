@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}HydroHelper{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="text-center mb-5">
+    <h1 class="display-5 fw-bold text-primary">HydroHelper</h1>
+    <p class="lead text-muted">Specialized tools for USGS hydrographers.</p>
+  </div>
+
+  <div class="row justify-content-center g-4">
+    <div class="col-md-4">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title fw-bold">Flow Balance Plotter</h5>
+          <p class="card-text text-muted">Compare discharge time series across sites with time-of-travel correction and composite tributary support.</p>
+        </div>
+        <div class="card-footer bg-transparent border-0 pb-3">
+          <a href="/flowbalance/" class="btn btn-primary btn-sm">Open Tool</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title fw-bold">Rating Developer</h5>
+          <p class="card-text text-muted">Develop rating curves using field measurements and cross-site discharge transfer with time-of-travel correction.</p>
+        </div>
+        <div class="card-footer bg-transparent border-0 pb-3">
+          <span class="btn btn-outline-secondary btn-sm disabled">Coming Soon</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title fw-bold">ALERT2 Dashboard</h5>
+          <p class="card-text text-muted">Real-time tabular display of Novastar ALERT2 telemetry stations mapped to USGS monitoring sites.</p>
+        </div>
+        <div class="card-footer bg-transparent border-0 pb-3">
+          <span class="btn btn-outline-secondary btn-sm disabled">Coming Soon</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

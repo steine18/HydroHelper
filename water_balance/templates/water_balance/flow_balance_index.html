@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Flow Balance — HydroHelper{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-center align-items-center" style="min-height: calc(100vh - 56px);">
+  <div class="card shadow-sm" style="width: 360px;">
+    <div class="card-body p-4">
+      <h5 class="card-title fw-bold mb-1">Flow Balance Plotter</h5>
+      <p class="text-muted small mb-4">Enter a USGS site number to get started.</p>
+      <form method="get" action="">
+        <div class="mb-3">
+          <label for="site" class="form-label fw-semibold">Primary Site Number</label>
+          <input type="text" id="site" name="site" class="form-control" placeholder="e.g. 09419800" autofocus>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Load Site</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
