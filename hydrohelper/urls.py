@@ -22,4 +22,9 @@ urlpatterns = [
     path('', TemplateView.as_view(template_name='home.html'), name='home'),
     path('admin/', admin.site.urls),
     path('flowbalance/', include('water_balance.urls')),
+    path('alert2/', include('alert2.urls')),
+    path('accounts/', include('accounts.urls')),
+    path('accounts/', include('allauth.urls')),
+    path('analysis/', include('analysis.urls')),
+    path('rating/', include('rating_developer.urls')),
 ]

@@ -163,16 +163,75 @@
 
       <button type="button" class="add-site-btn" onclick="addRow()">+ Add Comparison Site</button>
 
+      {% if user.is_authenticated %}
+      <hr class="my-2">
+      <p class="section-label">Save Configuration</p>
+      <div class="input-group input-group-sm">
+        <input type="text" id="config-name-input" class="form-control form-control-sm" placeholder="Configuration name">
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="saveConfig()">Save</button>
+      </div>
+      <div id="save-feedback" class="small mt-1"></div>
+      {% endif %}
+
     </div><!-- end controls-body -->
   </form>
 
-  <!-- ── Plot ── -->
-  <div class="card shadow-sm flex-grow-1" style="min-width:0; padding:0.75rem;">
-    {% if error %}
-      <div class="alert alert-danger mb-0">{{ error }}</div>
-    {% elif plot_html %}
-      {{ plot_html|safe }}
+  <!-- ── Right column: plot + map ── -->
+  <div class="flex-grow-1 d-flex flex-column gap-3" style="min-width:0;">
+
+    <!-- Plot -->
+    <div class="card shadow-sm" style="padding:0.75rem;">
+      {% if error %}
+        <div class="alert alert-danger mb-0">{{ error }}</div>
+      {% elif plot_html %}
+        {{ plot_html|safe }}
+      {% endif %}
+    </div>
+
+    <!-- Site Map -->
+    {% if map_html %}
+    <div class="card shadow-sm" style="padding:0.75rem;">
+      <p class="section-label mb-2">Site Map</p>
+      {{ map_html|safe }}
+    </div>
     {% endif %}
+
+    <!-- Data Table -->
+    {% if table_data %}
+    <div class="card shadow-sm" style="padding:0.75rem;">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <p class="section-label mb-0">Data Table</p>
+        <button class="btn btn-outline-secondary btn-sm" type="button"
+                data-bs-toggle="collapse" data-bs-target="#data-table-collapse"
+                aria-expanded="false">
+          Show / Hide
+        </button>
+      </div>
+      <div class="collapse" id="data-table-collapse">
+        <div style="max-height:400px; overflow-y:auto;">
+          <table class="table table-sm table-bordered table-hover mb-0" style="font-size:0.8rem;">
+            <thead class="table-dark sticky-top">
+              <tr>
+                {% for h in table_data.headers %}
+                <th>{{ h }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in table_data.rows %}
+              <tr>
+                {% for cell in row %}
+                <td>{{ cell }}</td>
+                {% endfor %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
   </div>
 
 </div>
@@ -226,6 +285,28 @@
 
   function removeRow(btn) {
     btn.closest('.compare-row').remove();
+  }
+
+  async function saveConfig() {
+    const name = document.getElementById('config-name-input').value.trim();
+    const feedback = document.getElementById('save-feedback');
+    if (!name) {
+      feedback.innerHTML = '<span class="text-danger">Enter a name first.</span>';
+      return;
+    }
+    const formData = new FormData(document.getElementById('main-form'));
+    formData.set('config_name', name);
+    const resp = await fetch("{% url 'save_flow_balance' site_number %}", {
+      method: 'POST',
+      headers: {'X-CSRFToken': '{{ csrf_token }}'},
+      body: formData,
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      feedback.innerHTML = `<span class="text-success">${data.created ? 'Saved!' : 'Updated!'}</span>`;
+    } else {
+      feedback.innerHTML = `<span class="text-danger">${data.error}</span>`;
+    }
   }
 </script>
 {% endblock %}

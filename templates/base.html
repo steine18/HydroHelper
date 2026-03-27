@@ -34,11 +34,9 @@
     {% block nav_extra %}{% endblock %}
     <div class="ms-auto">
       {% if user.is_authenticated %}
-        <a href="#" class="btn btn-outline-light btn-sm">
-          {{ user.username }}
-        </a>
+        <a href="{% url 'account' %}" class="btn btn-outline-light btn-sm">{{ user.username }}</a>
       {% else %}
-        <a href="#" class="btn btn-outline-light btn-sm">Log In</a>
+        <a href="{% url 'login' %}" class="btn btn-outline-light btn-sm">Log In</a>
       {% endif %}
     </div>
   </div>
