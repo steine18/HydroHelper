@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Summary — {{ site_no }}{% if site_name %} {{ site_name }}{% endif %} — HydroHelper{% endblock %}
+
+{% block extra_style %}
+.pct-good  { color: #198754; font-weight: 600; }
+.pct-warn  { color: #fd7e14; font-weight: 600; }
+.pct-bad   { color: #dc3545; font-weight: 600; }
+.table-daily td, .table-daily th { white-space: nowrap; }
+{% endblock %}
+
+{% block nav_extra %}
+<span class="text-white ms-3 fw-semibold">
+  {{ site_no }}{% if site_name %} — {{ site_name }}{% endif %}
+</span>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3 px-4">
+
+  <!-- Controls row -->
+  <div class="d-flex align-items-end gap-3 mb-4 flex-wrap">
+    <form method="get" action="" class="d-flex align-items-end gap-3 flex-wrap">
+      <div>
+        <label class="form-label fw-semibold mb-1" for="start">Start Date</label>
+        <input type="date" id="start" name="start" class="form-control form-control-sm" value="{{ start }}">
+      </div>
+      <div>
+        <label class="form-label fw-semibold mb-1" for="end">End Date</label>
+        <input type="date" id="end" name="end" class="form-control form-control-sm" value="{{ end }}">
+      </div>
+      <div>
+        <button type="submit" class="btn btn-primary btn-sm">Update</button>
+      </div>
+    </form>
+    <div class="ms-auto d-flex gap-2">
+      <a href="{% url 'alert2_site_data' site_no=site_no %}" class="btn btn-outline-secondary btn-sm">Data View</a>
+      <a href="{% url 'alert2_index' %}" class="btn btn-outline-secondary btn-sm">Change Site</a>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+  {% endif %}
+
+  <!-- Site-level schedule -->
+  {% if site %}
+  <div class="mb-4">
+    {% if site.transmit_interval_hours %}
+    <p class="text-muted small mb-1">
+      <span class="fw-semibold text-dark">Transmit Schedule:</span>
+      Every {{ site.transmit_interval_hours }}h at :{{ site.transmit_offset_minutes|stringformat:"02d" }} offset
+    </p>
+    {% else %}
+    <div class="alert alert-warning d-inline-block mb-2">Transmit schedule not configured for this site.</div>
+    {% endif %}
+
+    {% if user.is_superuser %}
+    <div>
+      <button class="btn btn-outline-secondary btn-sm" type="button"
+              data-bs-toggle="collapse" data-bs-target="#scheduleForm">
+        {% if site.transmit_interval_hours %}Edit Schedule{% else %}Configure Schedule{% endif %}
+      </button>
+      <div class="collapse mt-2" id="scheduleForm">
+        <div class="card card-body bg-light" style="max-width: 380px;">
+          <form method="post" action="">
+            {% csrf_token %}
+            <div class="row g-2 mb-2">
+              <div class="col-6">
+                <label class="form-label small fw-semibold mb-1">Interval (hours)</label>
+                <input type="number" name="transmit_interval_hours" class="form-control form-control-sm"
+                       min="1" max="24" placeholder="e.g. 1, 4, 8"
+                       value="{{ site.transmit_interval_hours|default:'' }}">
+              </div>
+              <div class="col-6">
+                <label class="form-label small fw-semibold mb-1">Offset (minutes)</label>
+                <input type="number" name="transmit_offset_minutes" class="form-control form-control-sm"
+                       min="0" max="1439" placeholder="e.g. 0, 10"
+                       value="{{ site.transmit_offset_minutes }}">
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Save</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Per-locator stats -->
+  {% if site.transmit_interval_hours %}
+  {% for entry in locator_stats %}
+  <div class="mb-5">
+
+    <h5 class="fw-bold mb-3">
+      {{ entry.label }}
+      <span class="text-muted fw-normal small">(ID: {{ entry.locator.point_locator }})</span>
+    </h5>
+
+    {% if entry.fetch_error %}
+    <div class="alert alert-danger">{{ entry.fetch_error }}</div>
+    {% elif entry.daily_rows %}
+
+    <!-- Summary cards -->
+    <div class="row g-3 mb-4" style="max-width: 600px;">
+      <div class="col-6">
+        <div class="card text-center shadow-sm">
+          <div class="card-body py-3">
+            <div class="text-muted small mb-1">7-Day</div>
+            <div class="display-6 fw-bold
+              {% if entry.summary_7d.pct >= 90 %}pct-good
+              {% elif entry.summary_7d.pct >= 70 %}pct-warn
+              {% else %}pct-bad{% endif %}">
+              {{ entry.summary_7d.pct }}%
+            </div>
+            <div class="text-muted small mt-1">
+              {{ entry.summary_7d.received }} / {{ entry.summary_7d.expected }} received
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="card text-center shadow-sm">
+          <div class="card-body py-3">
+            <div class="text-muted small mb-1">30-Day</div>
+            <div class="display-6 fw-bold
+              {% if entry.summary_30d.pct >= 90 %}pct-good
+              {% elif entry.summary_30d.pct >= 70 %}pct-warn
+              {% else %}pct-bad{% endif %}">
+              {{ entry.summary_30d.pct }}%
+            </div>
+            <div class="text-muted small mt-1">
+              {{ entry.summary_30d.received }} / {{ entry.summary_30d.expected }} received
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Daily table -->
+    <div class="table-responsive" style="max-width: 500px;">
+      <table class="table table-sm table-bordered table-hover table-daily">
+        <thead class="table-light">
+          <tr>
+            <th>Date</th>
+            <th class="text-end">Expected</th>
+            <th class="text-end">Received</th>
+            <th class="text-end">%</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in entry.daily_rows reversed %}
+          <tr>
+            <td>{{ row.date }}</td>
+            <td class="text-end">{{ row.expected }}</td>
+            <td class="text-end">{{ row.received }}</td>
+            <td class="text-end fw-semibold
+              {% if row.pct >= 90 %}pct-good
+              {% elif row.pct >= 70 %}pct-warn
+              {% else %}pct-bad{% endif %}">
+              {{ row.pct }}%
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% endif %}
+  </div>
+  {% empty %}
+  <div class="alert alert-info">No point locators configured for this site.</div>
+  {% endfor %}
+  {% endif %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}ALERT2 Batch Decoder — HydroHelper{% endblock %}
+
+{% block extra_style %}
+.mono { font-family: 'Courier New', Courier, monospace; font-size: 0.82em; }
+{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 1100px;">
+  <div class="d-flex align-items-center mb-1 gap-2">
+    <h4 class="mb-0 fw-bold">ALERT2 Batch Decoder</h4>
+    <a href="{% url 'alert2_parser_decode' %}" class="btn btn-outline-primary btn-sm ms-auto">Single Packet</a>
+  </div>
+  <p class="text-muted small mb-4">Upload a plain-text file with one packet per line (hex MANT payload or IND CSV AL22a format).</p>
+
+  <form method="post" enctype="multipart/form-data" class="mb-4">
+    {% csrf_token %}
+    <div class="d-flex gap-3 align-items-end flex-wrap">
+      <div>
+        <label class="form-label mb-1 small fw-semibold">Packet file (.txt / .csv / .log)</label>
+        <input type="file" name="packet_file" class="form-control form-control-sm" accept=".txt,.csv,.log">
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">Upload &amp; Decode</button>
+    </div>
+  </form>
+
+  {% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+  {% endif %}
+
+  {% if rows is not None %}
+  {% with total=rows|length valid_count=0 %}
+  <div class="d-flex align-items-center gap-3 mb-3">
+    <span class="fw-semibold">{{ total }} line{{ total|pluralize }}</span>
+    {% if filename %}<span class="text-muted small">— {{ filename }}</span>{% endif %}
+
+    {# Count valid/invalid in template #}
+    {% for row in rows %}{% if row.valid %}{% with valid_count=valid_count|add:1 %}{% endwith %}{% endif %}{% endfor %}
+  </div>
+  {% endwith %}
+
+  <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle">
+      <thead class="table-light">
+        <tr>
+          <th style="width:55px">#</th>
+          <th style="width:85px">Status</th>
+          <th>Raw input (truncated)</th>
+          <th>Summary / Reason</th>
+          <th style="width:80px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td class="mono text-muted">{{ row.line_no }}</td>
+          <td>
+            {% if row.valid %}
+            <span class="badge bg-success">Valid</span>
+            {% else %}
+            <span class="badge bg-danger">Invalid</span>
+            {% endif %}
+          </td>
+          <td class="mono small" style="max-width:420px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ row.truncated_raw }}</td>
+          <td class="small {% if not row.valid %}text-danger{% else %}text-muted{% endif %}">
+            {% if row.valid %}{{ row.summary|default:"—" }}{% else %}{{ row.reason }}{% endif %}
+          </td>
+          <td>
+            {# Each Decode button posts the raw line to the decode view #}
+            <form method="post" action="{% url 'alert2_parser_decode' %}" style="display:inline;">
+              {% csrf_token %}
+              <input type="hidden" name="packet" value="{{ row.raw }}">
+              <button type="submit" class="btn btn-outline-secondary btn-sm py-0 px-2">Decode</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center text-muted">No lines found in file.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

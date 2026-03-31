@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}ALERT2 Dashboard — HydroHelper{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-center align-items-start p-4">
+  <div class="card shadow-sm" style="width: 360px;">
+    <div class="card-body p-4">
+      <h5 class="card-title fw-bold mb-1">ALERT2 Dashboard</h5>
+      <p class="text-muted small mb-4">Enter a USGS site number to view Novastar telemetry data.</p>
+      <form method="get" action="">
+        <div class="mb-3">
+          <label for="site" class="form-label fw-semibold">USGS Site Number</label>
+          <input type="text" id="site" name="site" class="form-control" placeholder="Site number" autofocus>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Load Site</button>
+      </form>
+      <hr class="my-3">
+      <a href="{% url 'alert2_overview' %}" class="btn btn-outline-secondary w-100 btn-sm">View All Sites Overview</a>
+      <hr class="my-3">
+      <div class="text-muted small fw-semibold mb-2">Packet Tools</div>
+      <a href="{% url 'alert2_parser_decode' %}" class="btn btn-outline-secondary w-100 btn-sm mb-2">ALERT2 Packet Decoder</a>
+      <a href="{% url 'alert2_parser_batch' %}" class="btn btn-outline-secondary w-100 btn-sm">Batch File Decoder</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

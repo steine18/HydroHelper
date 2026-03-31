@@ -1,0 +1,19 @@
+Precipitation Record: Describe the completeness the precipitation record for the period. Include general discussion of periods with any problems (ice/snow or clogged funnel periods, for example).
+
+Backup Data: Describe where the backup data came from, why there was a gap in the primary time-series, and the period that contains the merged data.
+
+Missing Data or Affected by Ice/Snow or Funnel Clog: Provide dates for periods when recorded precipitation is missing or was likely affected by funnel clogging, or snow/ice.
+
+Edits: Discuss all edits/deletions to the recorded data, including reasoning for the erroneous values. Provide dates for any gaps in recorded rainfall values.
+
+Corrections: Clearly describe the reasoning and timing for any corrections. Factor corrections (or any type of correction) are extremely rare and difficult to support; justification must be clearly described.
+
+Estimates: Provide dates for estimated daily value periods (no instantaneous value estimates except for short periods of no rainfall that are fully documented). Describe methods used in developing estimated daily value gage precipitation amounts.
+
+Hyetographic Comparison: (Required for all analysis periods, including those with no missing record, unless suitable comparison sites are not available) Identify all sites used for comparison. If a suitable site is not available, state why (comparison site too distant, destroyed, or other reason). Discuss how each comparison was done and document the results. When did the site hyetographs compare favorably; when did they compare poorly and why?
+
+Calibrations: Provide the number and dates of any instrument calibrations made during the period. Summarize the results and actions taken following each calibration.
+
+Comments: Provide any pertinent remarks or comments for the analysis period that are not contained in the above sections, such as recommendations that might help to remediate compromising site conditions.
+
+Last Revised: 08/30/2017

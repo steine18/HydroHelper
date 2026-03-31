@@ -1,0 +1,39 @@
+Gage Height Record: State the quality of the gage height record (good, fair, poor) for the analysis period. State the range of stage experienced during analysis period (min and max). Included general discussion of periods with any problems (missing record, for example).
+
+Datum: Provide the date of the most recent levels. If run during analysis period, discuss the results of the level run, provide the reasoning / justification for any datum correction, and explain how the datum correction was applied, include dates.
+
+Backup Data: Describe source of the backup data (EDL, etc.), the quality of the backup data, why there was a gap in the primary time-series, and the period that contains the merged data.
+
+Ice Affected: Provide dates for periods when recorded gage heights are affected by ice.
+
+Edits: Discuss all edits to the recorded gage heights, including reasoning for the erroneous values and methods used in making edits. Provide dates for any gaps in recorded gage heights.
+
+Gage-Height Corrections: Clearly describe the reasoning and timing for any gage height corrections. Blanket statements for small instrument drift (< 0.03 ft) can be provided. Larger corrections need detailed discussion.
+
+Other Corrections: Provide the reasoning and application period for any flushing, purge, or drawdown corrections. Provide detailed discussion on any other types of corrections that were developed, their period of applicability, and why they were deemed necessary for the analysis period. (Note: corrections that vary by stage such as drawdown corrections require a well defined relationship built upon direct observations of the reference gage and recorder over range of stage and events. Document(s) with supporting plots/analyses/discussions should be referenced and properly stored in accordance with WSC policy)
+
+Peak Stage: Provide the maximum recorded peak stage value, and the independent peak stage value (including assessed uncertainty of the independent peak stage value and the type of independent peak stage device used). The results of the verification procedure should be described, including which peak stage value was determined to be the valid maximum stage for the analysis period (See OSW TM 14.06). Finally, indicate how this peak value relates to the previous peaks observed during the water year.
+
+Stage-Discharge Relation: Indicate rating(s) (by number) active for analysis period. Include information on when the rating was initially activated and when it was created. Rating description should be stored in SIMS station description element RATING (OPS). All rating descriptions should be contained in this element with the newest (active) description at the top. Surveyed cross sections of hydraulic controls should also be documented in the SIMS station description element RATING (OPS) Provide general assessment of how measurements made during analysis period plot on active rating curve.
+
+Discharge Measurements and Control Conditions: Summarize the discharge measurements (including observations of zero flow) made during the analysis period; number made, range of flow measured, and the hydraulic controls that were in effect for each measurement. Document the condition of the hydraulic control for each measurement or inspection (reference/cite any archived photos that corroborate described conditions). Identify/discuss any check measurements made or any measurements made but marked as not used.
+
+Shift Curves: Discuss the form of all shift curves developed for the analysis period. This includes selected merge gage heights and selected hinge gage heights. Discussion should be focused on how the shift curves relate to the hydraulic control and the observed control conditions--what is presumed to have caused the measurements to plot where they do with respect to the rating curve?
+
+Application of Shift Curves: Describe how the developed shift curves were applied to the time series. Discussion should relate the causes (discussed in Shift Curves section) to the application. The shift curves should be applied to the time series in a manner that agrees with the cause for the changes to the hydraulic control. If multiple events occurred between measurements explain which event (or events) were used to apply the shifts and why. Provide justification whenever a shift is simply prorated from visit to visit.
+
+Computed Discharge: State the quality (excellent, good, fair, poor) of the computed discharge record for the analysis period and provide brief reasoning for the assigned quality. State the range of flow experienced during analysis period (min and max) in relation to recent measurements of discharge. Include general discussion of uncertainty in the computed discharge for the analysis period. This discussion should incorporate the quality of the recorded gage height, and the quality of the stage-discharge relation for the computed range of flows of the analysis period.
+
+Estimates: Provide dates for estimated periods. Describe methods used in developing estimated unit value discharges. Reference any supporting information that was used and archived as part of the estimation process.
+
+Hydrographic Comparison: (Required for all analysis periods, including those with no missing record, unless comparable sites are not available; if no comparison site is available, provide a statement to that effect.) Document sites used for hydrographic comparison. Discuss how the comparison was done and document the results of the comparison. When did the site hydrographs compare favorably, when did they compare poorly and why? Reference any supporting information (such as plotted hydrographs) that were used in the comparison.
+
+Peak Streamflow: Provide the maximum computed peak streamflow value based upon the peak verification results discussed in Peak Stage section. Finally, indicate how this peak streamflow value relates to the previous peak streamflows observed during the water year.
+
+Extremes For 20XX Water Year: If analysis period closes out a water year provide maximum instantaneous discharge and corresponding gage height, minimum daily discharge, and peak gage height (if not associated with maximum instantaneous discharge). Include any needed qualification statements for these values. Example shown below.
+
+Extremes For 2017 Water Year: Maximum discharge, 3,250 ft3/s, May 2, gage height, 12.25 ft. Minimum daily discharge, 101 ft3/s, Feb. 23. Peak gage height, 14.44 ft, Jan. 29, ice affected.
+
+Comments: Provide any pertinent remarks or comments for the analysis period that are not contained in the above sections.
+
+Last Revised: 08/30/2017

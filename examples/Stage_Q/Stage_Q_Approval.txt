@@ -1,0 +1,138 @@
+1. Discharge Measurements, Field Notes, Level Notes, Station Description:
+
+1.1. Were discharge measurements, field notes, and level notes adequately reviewed (and corrected, if necessary) and were these reviews documented in accordance with WSC procedures? (if not, this task must be completed before approval)
+
+1.2. Have measurements, field notes, level notes, and other information been properly stored / archived in accordance with WSC procedures?
+
+1.3. Has the Station Description been properly updated to reflect any changes that occurred or were made during the analysis period?
+
+2. Levels:
+
+2.1. Date of last levels:
+
+2.2. Are levels overdue? If levels are overdue, or determined to be invalid, analysis period should not be approved until levels are run. If levels are overdue and the record is analyzed and then approved, revisions may be required as per established revision criteria. Levels frequency requirements follow:
+
+1 year for new sites until 3 sets of levels are run
+1 year for new sites with new reference gage installation until 3 sets of levels are run
+1 year for sites where a datum correction was determined from previous levels
+3 years for long-term sites
+5 years for long-term stable sites (there should be documentation of stability)
+2.3. Were levels run during the analysis period? (if no, go on to section 3)
+
+2.3.1. Were levels done in compliance with T&M 3-A19 (if not, period cannot be approved until a valid set of levels is run as outlined in Appendix E, p. 59)?
+
+2.3.2. Have levels data been updated in the Historic Levels Summary and Station Description, and are those data accurate?
+
+2.4. Was a datum correction of 0.015 ft or more identified? (if no, go on to section 3)
+
+2.4.1. Was datum correction input into proper correction set (Set 1)?
+
+2.4.2. Does the magnitude of the applied correction agree with the difference between gage datum and the reference gage found during levels?
+
+2.4.3. Is the presumed cause for the datum correction explained in the station analysis and is the explanation valid?
+
+2.4.4. Does application of the correction (prorated or constant) to the time series agree with the presumed cause and explanation provided in the station analysis?
+
+2.4.5. Were reference gage readings made during site visits, and gage heights associated with discharge measurements, properly adjusted based upon the datum correction?
+
+2.4.6. Does application of the correction extend into a period of previously approved data? If so, was the approved period evaluated in accordance with applicable revision criteria?
+
+3. Gage-Height Edits:
+
+3.1. Were erroneous recorded gage heights removed?
+
+3.1.1. Was the basis for removal adequately discussed in the station analysis?
+
+3.2. Were backup data available, downloaded, and used to fill any gaps in transmissions?
+
+3.2.1. Were these steps adequately discussed in the station analysis?
+
+3.3. Were periods of ice affected recorded gage heights properly identified and discussed?
+
+4. Gage-Height Corrections:
+
+4.1. Do gage-height correction values agree with differences observed between reference gage and recorder? (examine field notes and compare reference gage and recorder readings to defined gage height correction values)
+
+4.2. Is the applied timing of each gage height correction valid, and does it agree with the rationale provided in the station analysis?
+
+4.3. Have larger corrections (> 0.03 ft) been adequately discussed? (Note: Blanket statements for small instrument drift can be provided. Larger corrections require detailed discussion.)
+
+4.4. Were gage-height corrections properly entered using correction set 2?
+
+5. Other types of data corrections:
+
+5.1. Were other types of data corrections (flushing, purging, drawdown, etc.) defined and applied during the analysis period? (if no, go on to section 6)
+
+5.2. Were flushing or purge corrections defined and applied? (if no, go on to section 5.3)
+
+5.2.1. Do flushing or purge correction values agree with differences observed between reference gage and recorder both pre- and post-flush / purge? (examine field notes and compare the difference between reference gage and recorder readings to input correction values)
+
+5.2.2. Is the timing of application of flushing / purge corrections valid and does it agree with the rationale provided in station analysis?
+
+5.2.3. Were flushing / purge corrections properly entered using correction set 3?
+
+5.3. Were drawdown corrections defined and applied? (if no, go on to section 6)
+
+5.3.1. Was the drawdown correction curve based upon direct observations of the reference gage and recorder over a range of stage consistent with the variable correction applied in the record? (plots of observations should be referenced and archived)
+
+5.3.2. Was the basis of the drawdown correction curve adequately discussed in station analysis?
+
+5.3.3. Is timing of the applications of drawdown corrections valid and does it agree with the rationale provided in the station analysis? (note: drawdown corrections should be active throughout time period and the relation to stage consistent so long as the orifice configuration associated with drawdown remains the same)
+
+5.3.4. Were drawdown corrections properly input using correction set 3?
+
+6. Peak Stage:
+
+6.1. Were peak stage values verified according to the requirements of OSW TM 14.06? Assess validity of reasoning provided.
+
+6.2. Was a comparison of the verified peaks for the analysis period to the previous peaks for the water year provided in the station analysis? If analysis period spans the water year boundary, verify the peak stage value for the water year.
+
+7. Stage-Discharge Relation:
+
+7.1. Have all ratings that were active during the analysis period been documented and approved in accordance with WSC procedures? (if not, this task must be completed before approval)
+
+7.2. Does the active rating represent the current stage-discharge relation as indicated by documented control features and the plotting position of recent measurements made under clear control conditions?
+
+7.3. Have recent measurements been made that cover the range of computed discharge for the analysis period?
+
+8. Shift Curves:
+
+8.1. Are developed shift curves consistent with the shape of the base rating?
+
+8.2. Are developed shift curves associated with the same control feature consistent with one another (similar hinge and merge gage heights)?
+
+8.3. Are shift curves applicable to a specific hydraulic control feature sound and are they drawn such that they merge with the base rating at an appropriate gage height (usually in the transition between controls)? If not, has a valid explanation been provided?
+
+8.4. Have shapes of the shift curves been adequately explained with respect to selected hinge and merge gage heights, and with the hydraulic control?
+
+9. Application of Shift Curves:
+
+9.1. Does the timing of the application of the developed shift curves agree with the interpretation of the cause for the identified shift?
+
+9.2. Has the timing of the application of shift curves been adequately explained with respect to the hydrograph?
+
+10. Estimates:
+
+10.1. Are estimates appropriate, consistent, and developed using adequate methods and with due consideration of all available information? Has that information been documented appropriately?
+
+11. Hydrographic Comparison:
+
+11.1. Have hydrographic comparisons been adequately made and discussed (regardless of whether any data were estimated)? Have comparison plots been archived? If no comparison site is available, has a statement to that effect been provided in the analysis?
+
+12. Peak Streamflow:
+
+12.1. Have maximum computed peak streamflow values been adequately determined?
+
+12.2. Was a comparison of the computed peak streamflows for the analysis period to the previous peak streamflows for the water year contained in the station analysis? If analysis period spans the water year boundary, verify the peak streamflow for the water year.
+
+13. Daily Values
+
+13.1. Examine computed daily values for accuracy, completeness and proper use of qualifiers.
+
+14. Manuscript
+
+14.1. Have SIMS Manuscript elements been updated as needed?
+
+15. Approval Summary: Provide brief assessment of the analysis period in context of the findings outlined above. Discuss analyst's evaluation / quality rating of both stage and computed discharge record and provide your evaluation.
+
+16. Operational Follow Up: List suggested follow-up such as corrective actions or other needed information, measurements, or observations.

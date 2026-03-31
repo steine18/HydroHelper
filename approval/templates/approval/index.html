@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Approval Checklists — HydroHelper{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 860px;">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0">Approval Checklists</h4>
+    <a href="{% url 'approval_new' %}" class="btn btn-primary btn-sm">+ New Checklist</a>
+  </div>
+
+  <!-- In Progress -->
+  <h6 class="text-muted fw-semibold text-uppercase mb-2" style="font-size:0.75rem; letter-spacing:.05em;">In Progress</h6>
+  {% if drafts %}
+  <div class="card shadow-sm mb-4">
+    <div class="list-group list-group-flush">
+      {% for approval in drafts %}
+      <a href="{% url 'approval_detail' approval.pk %}" class="list-group-item list-group-item-action py-3">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="fw-semibold">{{ approval.site.site_no }} — {{ approval.site.name }}</div>
+            <div class="text-muted small">
+              {{ approval.get_approval_type_display }} &middot;
+              {{ approval.period_start }} to {{ approval.period_end }}
+            </div>
+          </div>
+          <div class="text-end ms-3" style="min-width: 110px;">
+            {% with pct=approval.completion_pct %}
+            <div class="small text-muted mb-1">{{ pct }}% complete</div>
+            <div class="progress" style="height: 6px;">
+              <div class="progress-bar bg-success" style="width: {{ pct }}%;"></div>
+            </div>
+            {% endwith %}
+            <div class="text-muted" style="font-size: 0.75rem; margin-top: 4px;">
+              {{ approval.updated_at|date:"N j, Y" }}
+            </div>
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <div class="card shadow-sm mb-4">
+    <div class="card-body text-center py-4 text-muted small">
+      No checklists in progress. <a href="{% url 'approval_new' %}">Create one.</a>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Completed -->
+  <h6 class="text-muted fw-semibold text-uppercase mb-2" style="font-size:0.75rem; letter-spacing:.05em;">Completed</h6>
+  {% if completed %}
+  <div class="card shadow-sm">
+    <div class="list-group list-group-flush">
+      {% for approval in completed %}
+      <a href="{% url 'approval_detail' approval.pk %}" class="list-group-item list-group-item-action py-3">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="fw-semibold">
+              <span class="badge bg-success me-1" style="font-size:0.7rem;">Complete</span>
+              {{ approval.site.site_no }} — {{ approval.site.name }}
+            </div>
+            <div class="text-muted small">
+              {{ approval.get_approval_type_display }} &middot;
+              {{ approval.period_start }} to {{ approval.period_end }}
+            </div>
+          </div>
+          <div class="text-muted text-end ms-3" style="font-size: 0.75rem; min-width: 80px;">
+            {{ approval.updated_at|date:"N j, Y" }}
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <div class="card shadow-sm">
+    <div class="card-body text-center py-4 text-muted small">
+      No completed checklists yet.
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

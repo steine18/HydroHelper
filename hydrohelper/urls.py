@@ -27,4 +27,6 @@ urlpatterns = [
     path('accounts/', include('allauth.urls')),
     path('analysis/', include('analysis.urls')),
     path('rating/', include('rating_developer.urls')),
+    path('approval/', include('approval.urls')),
+    path('alert2-parser/', include('alert2_parser.urls')),
 ]

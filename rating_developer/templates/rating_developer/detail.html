@@ -1,0 +1,479 @@
+{% extends "base.html" %}
+
+{% block title %}{{ config.site.site_no }} Rating — HydroHelper{% endblock %}
+
+{% block extra_style %}
+  .quality-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.78rem; color: white; font-weight: 600; }
+  #meas-table { font-size: 0.85rem; }
+  #meas-table thead th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+  #meas-table thead th.sortable:hover { background: #e2e6ea; }
+  #meas-table thead th.sortable::after { content: ' ⇕'; opacity: 0.35; font-size: 0.75em; }
+  #meas-table thead th.sort-asc::after { content: ' ↑'; opacity: 1; }
+  #meas-table thead th.sort-desc::after { content: ' ↓'; opacity: 1; }
+{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 1000px;">
+
+  <!-- Header -->
+  <div class="mb-4">
+    <div class="d-flex justify-content-between align-items-start">
+      <div>
+        <h5 class="fw-bold mb-1">{{ config.site.site_no }} — {{ config.site.name }}</h5>
+        <div class="text-muted small">Rating Developer</div>
+      </div>
+      <a href="{% url 'rating_index' %}" class="btn btn-outline-secondary btn-sm">← All Ratings</a>
+    </div>
+    <!-- Editable config name -->
+    <div class="mt-2 d-flex align-items-center gap-2">
+      <input type="text" id="config-name" class="form-control form-control-sm"
+             value="{{ config.name }}" style="max-width: 300px;">
+      <span class="text-muted small" id="name-status"></span>
+    </div>
+  </div>
+
+  <!-- Rating source card -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header py-2">
+      <h6 class="mb-0 fw-bold">Rating Source</h6>
+    </div>
+    <div class="card-body">
+      <form method="post" action="{% url 'rating_update' config.pk %}" id="rating-source-form">
+        {% csrf_token %}
+        <div class="d-flex gap-4 mb-3">
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="use_manual_rating"
+                   id="source-usgs" value="0"
+                   {% if not config.use_manual_rating %}checked{% endif %}
+                   onchange="document.getElementById('manual-rating-panel').style.display='none'">
+            <label class="form-check-label" for="source-usgs">Pull from USGS API</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="use_manual_rating"
+                   id="source-manual" value="1"
+                   {% if config.use_manual_rating %}checked{% endif %}
+                   onchange="document.getElementById('manual-rating-panel').style.display='block'">
+            <label class="form-check-label" for="source-manual">Enter manually</label>
+          </div>
+        </div>
+        <div id="manual-rating-panel" {% if not config.use_manual_rating %}style="display:none;"{% endif %}>
+          <p class="text-muted small mb-1">Paste stage/discharge pairs, one per line (tab, comma, or space separated). Stage first, then discharge.</p>
+          <textarea name="manual_rating_text" class="form-control font-monospace"
+                    rows="6" style="font-size:0.82rem;">{{ config.manual_rating_text }}</textarea>
+        </div>
+        <div class="mt-3">
+          <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+          {% if rating_error %}
+          <span class="text-danger small ms-2">{{ rating_error }}</span>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Chart + Rating Points -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center py-2">
+      <h6 class="mb-0 fw-bold">Rating Curve</h6>
+      <div class="btn-group btn-group-sm" role="group">
+        <button type="button" class="btn btn-primary" id="scale-log">Log</button>
+        <button type="button" class="btn btn-outline-secondary" id="scale-linear">Linear</button>
+      </div>
+    </div>
+    <div class="card-body p-2">
+      <div class="row g-2">
+        <!-- Plot -->
+        <div class="{% if rating_points or rating_curve %}col-9{% else %}col-12{% endif %}">
+          {{ chart_html|safe }}
+        </div>
+        <!-- Rating points table -->
+        {% if rating_points %}
+        <div class="col-3">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <div class="fw-semibold small text-muted">Rating Points</div>
+            <div class="d-flex gap-1">
+              <button class="btn btn-outline-secondary btn-sm" id="edit-rating-btn" style="font-size:0.75rem; padding:1px 7px;">Edit</button>
+              <button class="btn btn-success btn-sm d-none" id="save-rating-btn" style="font-size:0.75rem; padding:1px 7px;">Save</button>
+              <button class="btn btn-outline-secondary btn-sm d-none" id="cancel-edit-btn" style="font-size:0.75rem; padding:1px 7px;">Cancel</button>
+            </div>
+          </div>
+          <div style="max-height: 465px; overflow-y: auto;">
+            <table class="table table-sm table-bordered mb-0" style="font-size: 0.8rem;" id="rating-points-table">
+              <thead class="table-light sticky-top">
+                <tr>
+                  <th>Stage (ft)</th>
+                  <th>Discharge (cfs)</th>
+                  <th class="d-none edit-col"></th>
+                </tr>
+              </thead>
+              <tbody id="rating-points-tbody">
+                {% for pt in rating_points %}
+                <tr>
+                  <td class="rating-cell">{{ pt.stage }}</td>
+                  <td class="rating-cell">{{ pt.discharge }}</td>
+                  <td class="d-none edit-col text-center">
+                    <button class="btn btn-link btn-sm text-danger p-0 delete-row-btn" style="font-size:0.75rem;">✕</button>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <button class="btn btn-outline-primary btn-sm w-100 mt-1 d-none" id="add-row-btn" style="font-size:0.75rem;">+ Add Row</button>
+          <!-- Hidden form for saving -->
+          <form method="post" action="{% url 'rating_update' config.pk %}" id="save-rating-form" class="d-none">
+            {% csrf_token %}
+            <input type="hidden" name="use_manual_rating" value="1">
+            <input type="hidden" name="manual_rating_text" id="manual-rating-hidden">
+          </form>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Measurements table -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center py-2">
+      <h6 class="mb-0 fw-bold">Field Measurements</h6>
+      <span class="text-muted small">{{ measurements|length }} total</span>
+    </div>
+    <div class="card-body">
+      {% if meas_error %}
+      <div class="alert alert-warning py-2">{{ meas_error }}</div>
+      {% else %}
+
+      <!-- Date filter -->
+      <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+        <label class="form-label small mb-0 fw-semibold">Filter by date:</label>
+        <input type="date" id="filter-start" class="form-control form-control-sm" style="width:150px;"
+               value="{{ filter_start }}">
+        <span class="text-muted small">to</span>
+        <input type="date" id="filter-end" class="form-control form-control-sm" style="width:150px;"
+               value="{{ filter_end }}">
+        <button class="btn btn-sm btn-outline-primary" id="apply-filter-btn">Apply</button>
+        <button class="btn btn-sm btn-outline-secondary" id="clear-filter-btn">Clear</button>
+        <span class="text-muted small" id="filter-count"></span>
+      </div>
+
+      <!-- Table -->
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" id="meas-table">
+          <thead class="table-light">
+            <tr>
+              <th style="width:40px;"><input type="checkbox" class="form-check-input" id="toggle-all" title="Check/uncheck all visible"></th>
+              <th class="sortable" data-col="number" data-type="num">#</th>
+              <th class="sortable" data-col="date" data-type="str">Date</th>
+              <th class="sortable" data-col="stage" data-type="num">Stage (ft)</th>
+              <th class="sortable" data-col="discharge" data-type="num">Discharge (cfs)</th>
+              <th class="sortable" data-col="quality" data-type="str">Quality</th>
+            </tr>
+          </thead>
+          <tbody id="meas-tbody">
+            {% for m in measurements %}
+            <tr data-date="{{ m.date }}" data-meas-no="{{ m.number }}"
+                data-number="{{ m.number }}" data-stage="{{ m.stage }}"
+                data-discharge="{{ m.discharge }}" data-quality="{{ m.quality }}">
+              <td>
+                <input type="checkbox" class="form-check-input meas-toggle"
+                       data-meas-no="{{ m.number }}"
+                       {% if m.number|stringformat:"s" not in config.hidden_measurement_nos %}checked{% endif %}>
+              </td>
+              <td>{{ m.number }}</td>
+              <td>{{ m.date }}</td>
+              <td>{{ m.stage }}</td>
+              <td>{{ m.discharge }}</td>
+              <td>
+                {% if m.quality == 'Excellent' %}
+                  <span class="quality-badge" style="background: #2ECC40;">Excellent</span>
+                {% elif m.quality == 'Good' %}
+                  <span class="quality-badge" style="background: #0074D9;">Good</span>
+                {% elif m.quality == 'Fair' %}
+                  <span class="quality-badge" style="background: #FF851B;">Fair</span>
+                {% elif m.quality == 'Poor' %}
+                  <span class="quality-badge" style="background: #FF4136;">Poor</span>
+                {% else %}
+                  <span class="quality-badge" style="background: #AAAAAA;">{{ m.quality }}</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-muted text-center">No measurements found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+  const CSRF_TOKEN = '{{ csrf_token }}';
+  const TOGGLE_URL = "{% url 'rating_toggle_measurement' config.pk %}";
+  const UPDATE_URL = "{% url 'rating_update' config.pk %}";
+  const QUALITY_ORDER = {{ quality_order_json|safe }};
+  const QUALITY_COLORS = {{ quality_colors_json|safe }};
+  // Trace indices: 0 = rating curve line, 1 = control points, 2..N = quality groups
+  const QUALITY_TRACE_IDX = Object.fromEntries(QUALITY_ORDER.map((q, i) => [q, i + 2]));
+  const allMeasurements = {{ all_measurements_json|safe }};
+  let hiddenSet = new Set({{ hidden_nos_json|safe }});
+
+  // --- Plotly chart reference ---
+  const chartDiv = document.getElementById('rating-chart-plotly');
+
+  function rebuildQualityTrace(quality) {
+    if (!chartDiv) return;
+    const traceIdx = QUALITY_TRACE_IDX[quality];
+    if (traceIdx === undefined) return;
+    const pts = allMeasurements.filter(m => m.quality === quality && !hiddenSet.has(String(m.number)));
+    Plotly.restyle(chartDiv, {
+      x: [pts.map(m => m.discharge)],
+      y: [pts.map(m => m.stage)],
+      text: [pts.map(m => `#${m.number} — ${m.date}<br>Q: ${m.discharge} cfs<br>GH: ${m.stage} ft<br>${m.quality}`)],
+    }, [traceIdx]);
+  }
+
+  // --- Measurement toggles ---
+  document.querySelectorAll('.meas-toggle').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const measNo = String(cb.dataset.measNo);
+      const hide = !cb.checked;
+      if (hide) {
+        hiddenSet.add(measNo);
+      } else {
+        hiddenSet.delete(measNo);
+      }
+      const meas = allMeasurements.find(m => String(m.number) === measNo);
+      if (meas) rebuildQualityTrace(meas.quality);
+
+      fetch(TOGGLE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({ measurement_no: measNo, hidden: hide }),
+      });
+    });
+  });
+
+  // --- Check/uncheck all visible ---
+  function updateToggleAllState() {
+    const visibleCbs = Array.from(document.querySelectorAll('#meas-tbody tr'))
+      .filter(r => r.style.display !== 'none')
+      .map(r => r.querySelector('.meas-toggle'))
+      .filter(Boolean);
+    const allChecked = visibleCbs.length > 0 && visibleCbs.every(cb => cb.checked);
+    document.getElementById('toggle-all').checked = allChecked;
+    document.getElementById('toggle-all').indeterminate = !allChecked && visibleCbs.some(cb => cb.checked);
+  }
+
+  document.getElementById('toggle-all')?.addEventListener('change', function () {
+    const checked = this.checked;
+    const visibleRows = Array.from(document.querySelectorAll('#meas-tbody tr'))
+      .filter(r => r.style.display !== 'none');
+
+    visibleRows.forEach(row => {
+      const cb = row.querySelector('.meas-toggle');
+      if (!cb || cb.checked === checked) return;
+      cb.checked = checked;
+      const measNo = String(cb.dataset.measNo);
+      if (!checked) {
+        hiddenSet.add(measNo);
+      } else {
+        hiddenSet.delete(measNo);
+      }
+      const meas = allMeasurements.find(m => String(m.number) === measNo);
+      if (meas) rebuildQualityTrace(meas.quality);
+      fetch(TOGGLE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({ measurement_no: measNo, hidden: !checked }),
+      });
+    });
+  });
+
+  // Keep toggle-all in sync when individual boxes change
+  document.getElementById('meas-tbody')?.addEventListener('change', e => {
+    if (e.target.classList.contains('meas-toggle')) updateToggleAllState();
+  });
+
+  // --- Config name autosave ---
+  const nameInput = document.getElementById('config-name');
+  const nameStatus = document.getElementById('name-status');
+  let nameTimer = null;
+  nameInput.addEventListener('input', () => {
+    nameStatus.textContent = '';
+    clearTimeout(nameTimer);
+    nameTimer = setTimeout(async () => {
+      const resp = await fetch(UPDATE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({ name: nameInput.value }),
+      });
+      nameStatus.textContent = resp.ok ? 'Saved' : 'Error';
+    }, 600);
+  });
+
+  // --- Date filter (table only, client-side) ---
+  function applyFilter() {
+    const start = document.getElementById('filter-start').value;
+    const end = document.getElementById('filter-end').value;
+    let visible = 0;
+    document.querySelectorAll('#meas-tbody tr').forEach(row => {
+      const date = row.dataset.date || '';
+      const show = (!start || date >= start) && (!end || date <= end);
+      row.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    const total = document.querySelectorAll('#meas-tbody tr').length;
+    document.getElementById('filter-count').textContent =
+      (start || end) ? `${visible} of ${total} shown` : '';
+    updateToggleAllState();
+  }
+
+  document.getElementById('apply-filter-btn')?.addEventListener('click', applyFilter);
+  document.getElementById('clear-filter-btn')?.addEventListener('click', () => {
+    document.getElementById('filter-start').value = '';
+    document.getElementById('filter-end').value = '';
+    applyFilter();
+  });
+
+  // Apply filter on load if values are present
+  if (document.getElementById('filter-start')?.value || document.getElementById('filter-end')?.value) {
+    applyFilter();
+  }
+
+  // --- Manual rating panel toggle on load ---
+  const manualRadio = document.getElementById('source-manual');
+  if (manualRadio?.checked) {
+    document.getElementById('manual-rating-panel').style.display = 'block';
+  }
+
+  // --- Rating table edit mode ---
+  const editBtn = document.getElementById('edit-rating-btn');
+  const saveBtn = document.getElementById('save-rating-btn');
+  const cancelBtn = document.getElementById('cancel-edit-btn');
+  const addRowBtn = document.getElementById('add-row-btn');
+  const tbody = document.getElementById('rating-points-tbody');
+
+  function enterEditMode() {
+    // Convert cells to inputs
+    tbody.querySelectorAll('tr').forEach(row => {
+      row.querySelectorAll('.rating-cell').forEach(cell => {
+        const val = cell.textContent.trim();
+        cell.innerHTML = `<input type="number" step="any" class="form-control form-control-sm p-0 px-1" value="${val}" style="font-size:0.78rem; min-width:60px;">`;
+      });
+    });
+    document.querySelectorAll('.edit-col').forEach(el => el.classList.remove('d-none'));
+    document.querySelectorAll('.delete-row-btn').forEach(btn => attachDeleteRow(btn));
+    editBtn.classList.add('d-none');
+    saveBtn.classList.remove('d-none');
+    cancelBtn.classList.remove('d-none');
+    addRowBtn.classList.remove('d-none');
+  }
+
+  function attachDeleteRow(btn) {
+    btn.addEventListener('click', () => btn.closest('tr').remove());
+  }
+
+  function addRow() {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="rating-cell"><input type="number" step="any" class="form-control form-control-sm p-0 px-1" placeholder="stage" style="font-size:0.78rem; min-width:60px;"></td>
+      <td class="rating-cell"><input type="number" step="any" class="form-control form-control-sm p-0 px-1" placeholder="discharge" style="font-size:0.78rem; min-width:60px;"></td>
+      <td class="edit-col text-center"><button class="btn btn-link btn-sm text-danger p-0 delete-row-btn" style="font-size:0.75rem;">✕</button></td>`;
+    tbody.appendChild(tr);
+    attachDeleteRow(tr.querySelector('.delete-row-btn'));
+  }
+
+  function saveRating() {
+    const rows = [];
+    tbody.querySelectorAll('tr').forEach(row => {
+      const inputs = row.querySelectorAll('input[type="number"]');
+      if (inputs.length === 2) {
+        const stage = inputs[0].value.trim();
+        const discharge = inputs[1].value.trim();
+        if (stage !== '' && discharge !== '') rows.push(`${stage}\t${discharge}`);
+      }
+    });
+    document.getElementById('manual-rating-hidden').value = rows.join('\n');
+    document.getElementById('save-rating-form').submit();
+  }
+
+  editBtn?.addEventListener('click', enterEditMode);
+  saveBtn?.addEventListener('click', saveRating);
+  cancelBtn?.addEventListener('click', () => window.location.reload());
+  addRowBtn?.addEventListener('click', addRow);
+
+  // --- Log / Linear scale toggle ---
+  const logBtn = document.getElementById('scale-log');
+  const linearBtn = document.getElementById('scale-linear');
+
+  function setScale(type) {
+    Plotly.relayout(chartDiv, { 'xaxis.type': type });
+    if (type === 'log') {
+      logBtn.classList.replace('btn-outline-secondary', 'btn-primary');
+      linearBtn.classList.replace('btn-primary', 'btn-outline-secondary');
+    } else {
+      linearBtn.classList.replace('btn-outline-secondary', 'btn-primary');
+      logBtn.classList.replace('btn-primary', 'btn-outline-secondary');
+    }
+  }
+
+  logBtn?.addEventListener('click', () => setScale('log'));
+  linearBtn?.addEventListener('click', () => setScale('linear'));
+
+  // --- Sortable measurements table ---
+  let sortCol = null;
+  let sortDir = 1; // 1 = asc, -1 = desc
+
+  const QUALITY_RANK = { Excellent: 0, Good: 1, Fair: 2, Poor: 3, Unspecified: 4 };
+
+  function getCellValue(row, col) {
+    return row.dataset[col] ?? '';
+  }
+
+  function sortTable(th) {
+    const col = th.dataset.col;
+    const type = th.dataset.type;
+
+    if (sortCol === col) {
+      sortDir *= -1;
+    } else {
+      sortCol = col;
+      sortDir = 1;
+    }
+
+    // Update header indicators
+    document.querySelectorAll('#meas-table thead th.sortable').forEach(h => {
+      h.classList.remove('sort-asc', 'sort-desc');
+    });
+    th.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+
+    const tbody = document.getElementById('meas-tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+
+    rows.sort((a, b) => {
+      let av = getCellValue(a, col);
+      let bv = getCellValue(b, col);
+      let cmp;
+      if (col === 'quality') {
+        cmp = (QUALITY_RANK[av] ?? 99) - (QUALITY_RANK[bv] ?? 99);
+      } else if (type === 'num') {
+        cmp = (parseFloat(av) || 0) - (parseFloat(bv) || 0);
+      } else {
+        cmp = av.localeCompare(bv);
+      }
+      return cmp * sortDir;
+    });
+
+    rows.forEach(r => tbody.appendChild(r));
+  }
+
+  document.querySelectorAll('#meas-table thead th.sortable').forEach(th => {
+    th.addEventListener('click', () => sortTable(th));
+  });
+</script>
+{% endblock %}

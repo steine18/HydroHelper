@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Rating Developer — HydroHelper{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 860px;">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h5 class="fw-bold mb-0">Rating Developer</h5>
+  </div>
+
+  <!-- Site lookup form -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <form method="post" action="{% url 'rating_new' %}" class="d-flex gap-2 align-items-start">
+        {% csrf_token %}
+        <input type="text" name="site_no" class="form-control"
+               placeholder="Enter USGS site number…" style="max-width:220px;"
+               value="{{ site_no|default:'' }}">
+        <button type="submit" class="btn btn-primary">Open</button>
+      </form>
+      {% if error %}
+      <div class="text-danger small mt-2">{{ error }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Saved configs -->
+  {% if configs %}
+  <h6 class="text-muted mb-2">Saved Configurations</h6>
+  <div class="list-group shadow-sm">
+    {% for cfg in configs %}
+    <a href="{% url 'rating_detail' cfg.pk %}" class="list-group-item list-group-item-action">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <div class="fw-semibold">{{ cfg.name }}</div>
+          <div class="text-muted small">{{ cfg.site.site_no }} — {{ cfg.site.name }}</div>
+        </div>
+        <div class="text-muted small">{{ cfg.updated_at|date:"Y-m-d" }}</div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-muted">No saved configurations yet. Enter a site number above to get started.</p>
+  {% endif %}
+</div>
+{% endblock %}

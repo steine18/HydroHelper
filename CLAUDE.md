@@ -40,15 +40,15 @@ project/
 ├── water_balance/    # Water balance plotter tool (built)
 ├── alert2/           # ALERT2 / Novastar dashboard tool (built)
 ├── analysis/         # Station analysis report authoring tool (built)
-└── rating_developer/ # Rating curve development tool (built)
+├── rating_developer/ # Rating curve development tool (built)
+├── approval/         # Approval checklist tool (built)
+└── alert2_parser/    # ALERT2 IND packet decoder — single packet and batch file upload (built)
 ```
 
 Apps planned but not yet created:
 
 ```
-├── reports/          # Shared report saving/retrieval across tools (planned)
-├── alert2_parser/    # ALERT2 IND packet decoder — single packet and batch file upload (planned)
-└── approval/         # Report review and approval workflow (planned)
+└── reports/          # Shared report saving/retrieval across tools (planned)
 ```
 
 ---
@@ -96,6 +96,9 @@ Apps planned but not yet created:
   `error_pct()` computed as `(actual - desired) / desired * 100` (negative = under-reading).
 - **PrecipComparisonSite** — Links a comparison USGS site to a precipitation
   `AnalysisReport` for side-by-side data display. Unique per `(report, site)`.
+- **StageQComparisonSite** — Links a comparison USGS site to a stage/discharge
+  `AnalysisReport` for side-by-side discharge comparison. Unique per `(report, site)`.
+  Related name: `stage_q_comparison_sites`.
 
 ### `rating_developer` app (built)
 
@@ -104,12 +107,13 @@ Apps planned but not yet created:
   `manual_rating_text` (TextField), `hidden_measurement_nos` (JSONField, list of
   measurement number strings to exclude from the plot), `created_at`, `updated_at`.
 
-### `approval` app (planned — not yet built)
+### `approval` app (built)
 
-- **ApprovalRequest** — Links an `AnalysisReport` to a submitter and optional reviewer.
-  Status machine: `pending → approved / rejected / revised / withdrawn`.
-- **ApprovalComment** — Comments on an approval request. Can be general or anchored
-  to a specific report section via `section_key`, enabling future inline display.
+- **ApprovalRequest** — A standalone approval checklist for a site and date range.
+  Fields: `user` (FK), `site` (FK), `approval_type` (stage_discharge / precipitation /
+  groundwater), `period_start`, `period_end`, `response_data` (JSONField — stores all
+  answers keyed by question key), `status` (draft / complete), `created_at`, `updated_at`.
+  Has a `completion_pct()` helper that counts answered questions across all types.
 
 ---
 
@@ -243,14 +247,34 @@ adding one dict entry there, no other changes needed. Current types:
 **Stage/discharge report data panel** (shown above sections for stage/discharge reports):
 - Fetches discharge (00060) and gage height (00065) IV data, plus official daily values (DV,
   `statCd=00003`) for both parameters via `fetch_dv()` in `water_balance/usgs.py`.
-- **Water year extension** — if the analysis period crosses Oct 1, the IV/DV fetch is extended
-  back to Oct 1 of the water year containing `period_start`. Example: 7/1/25–12/1/25
-  fetches from 10/1/24. The prior-WY portion is shaded grey on the chart.
+- **Water year extension** — `data_start` is always extended back to Oct 1 of the water
+  year containing `period_start`, regardless of whether the period crosses a WY boundary.
+  This ensures full WY data is available for extremes computation. The prior-analysis
+  portion is shaded grey on the chart.
   Logic in `_water_year_start()` and `_stage_q_context()` in `analysis/views.py`.
 - Displays a dual-axis Plotly time series chart (discharge blue/left, gage height orange/right)
-- Stats table: peak, minimum instantaneous, and minimum daily mean for both parameters.
-  Minimum daily mean values come from the USGS DV API (official approved daily means), not
-  computed by averaging IV data. Falls back to IV-computed mean if DV returns no data.
+- **Comparison sites** — add any number of USGS sites to compare discharge side-by-side;
+  stored in `StageQComparisonSite`; comparison discharge traces are added to the chart
+  in `_COMPARISON_COLORS` order; a side-by-side stats table shows peak, min instantaneous,
+  and min daily mean for each site. Add/remove UI in the data panel header.
+  URLs: `analysis_add_stage_q_comparison`, `analysis_delete_stage_q_comparison`.
+  Helper: `_process_stage_q_site()` in `analysis/views.py`.
+- **Analysis period stats** — two-column table (Discharge | Gage Height) showing peak,
+  min instantaneous, and min daily mean filtered to `period_start`–`period_end` exactly.
+  Labeled "Analysis Period: MM/DD/YYYY – MM/DD/YYYY". Minimum daily mean comes from the
+  USGS DV API; falls back to IV-computed mean if DV returns no data.
+- **Water year stats table** — compact table with one row per water year that intersects
+  the analysis period (including partial WYs). Columns: Water Year, Peak Q (cfs) + date,
+  Peak GH (ft) + date, Min Daily Q (cfs) + date. Uses `_water_years_intersecting()` in
+  `analysis/views.py` (distinct from `_water_years_in_range()` which only returns
+  closed-out WYs used for extremes sentences).
+- **Field measurements table** — USGS field measurements from the analysis period fetched
+  via `fetch_measurements()` from `rating_developer/usgs.py` (USGS OGC API). Columns:
+  `#`, `Date`, `Stage (ft)`, `Discharge (cfs)`, `Quality` (color-coded using
+  `QUALITY_COLORS` from `rating_developer/usgs.py`). Summary line shows count and
+  discharge range (min–max cfs). Hidden if no measurements in the period. Errors from
+  the API are silently ignored so a failed fetch doesn't break the page.
+  Gage height values are always formatted to 2 decimal places throughout the panel.
 - **Extremes for Water Year** section is auto-generated (read-only, no textarea) per water year.
   A sentence is only generated for water years that the analysis period **closes out** — i.e.,
   Sep 30 of that WY falls within the analysis period.
@@ -258,9 +282,12 @@ adding one dict entry there, no other changes needed. Current types:
   - 10/2/25–3/1/26 → no extremes (Sep 30 of neither WY25 nor WY26 is within range)
   - 9/1/24–3/1/26 → closes out WY24 and WY25
   - Each entry rendered with a "Extremes for WYXX" header above the sentence.
-  - Format: "Maximum discharge, X ft³/s, Mmm. d, gage height, X.XX ft. Minimum daily
-    discharge, X ft³/s, Mmm. d. Peak gage height, X.XX ft, Mmm. d." (third sentence only
-    if peak gage height date differs from peak discharge date).
+  - Format: "Maximum discharge, X ft³/s, Mmm. d, gage height, X.XX ft. Maximum gage
+    height, X.XX ft, Mmm. d. Minimum daily discharge, X ft³/s, Mmm. d." All three
+    sentences are always included.
+  - Extremes always use the full water year (Oct 1–Sep 30), never clipped to the
+    analysis period start. `_water_years_in_range()` returns `wy_s` (Oct 1) as the
+    range start, not `clip_start`.
   - Minimum daily discharge comes from the USGS DV API (official daily mean).
   - Peak/gage-height dates are formatted in the **gage's local time zone**. The IV API
     returns timestamps with the local UTC offset embedded (e.g. `-07:00`). `fetch_iv()`
@@ -291,7 +318,8 @@ adding one dict entry there, no other changes needed. Current types:
 - `examples/Stage_Q/Stage_Q_Analysis.txt` — official section guidance; embedded in prompts
   as section guidance (labelled "SECTION GUIDANCE")
 - `examples/GW/GW_Analysis.txt` — same for groundwater
-- `*_Approval.txt` files exist but are not used yet (reserved for approval workflow)
+- `*_Approval.txt` files — source of truth for approval checklist questions; used when
+  building `approval/approval_types.py` but not loaded at runtime
 - Loaded at runtime by `_load_example(report_type)` in `analysis/views.py` — editing the
   files updates the prompts without any code changes
 
@@ -331,40 +359,181 @@ datetime string before UTC conversion, e.g. `-420` for `-07:00`).
 
 ---
 
-### 5. ALERT2 Packet Parser (planned)
+### 5. Approval Checklist (built)
+
+**Purpose:** Standalone structured approval checklist for stage/discharge, precipitation,
+and groundwater station records. The reviewer fills out the checklist independently
+(not linked to an existing AnalysisReport).
+
+**Django app:** `approval/`
+
+**Question types** (defined in `approval/approval_types.py`):
+- `yn` — radio button group (Bootstrap btn-group) + comment textarea. Buttons are driven
+  by an `options` list on each item (see below); always rendered with good options first.
+- `date` — date picker + comment textarea
+- `text` — large textarea + Green / Orange / Red color picker. The selected color is saved
+  in `response_data[key].color` and applied to the text block in the report.
+
+**`_yn` helper — `options` and `good_response`:**
+- Every `yn` item carries an `options` list: `[{'value', 'label', 'good'}, ...]`
+- `good_response='yes'` (default) → options order: Yes (green) · No (red) · N/A (gray)
+- `good_response='no'` → options order: No (green) · Yes (red) · N/A (gray)
+- `good_response='both'` → options order: Yes (green) · No (green) · N/A (gray)
+- Custom `options=[ ]` list may be passed directly for non-standard buttons (e.g. q3_3
+  in stage/discharge has No Ice · Yes · No · N/A with No Ice and Yes both green).
+- N/A is always gray regardless of `good_response`.
+- Good options always sort before bad options; N/A always last.
+- In the report, `approval_report` view computes `ans_label` (display string) and
+  `ans_class` (CSS class: `answer-yes`, `answer-no`, `answer-na`, `answer-blank`) for
+  each `yn` response by looking up the answer value in the item's `options` list.
+
+**Questions where `good_response='no'` (No is the good/green answer):**
+- Stage/discharge 2.2 — "Are levels overdue?"
+- Precipitation 2.2 — "Is a calibration overdue?"
+- Precipitation 2.4 — "Did the calibration error exceed 5%?"
+- Groundwater 3.2 — "Are levels or reference point inspections overdue?"
+
+**Questions where `good_response='both'` (both Yes and No are acceptable/green) —**
+these are all conditional gate questions where either answer is situationally fine:
+- Stage/discharge 2.3, 2.4, 5.1, 5.2, 5.3
+- Precipitation 2.3
+- Groundwater 3.4, 3.5
+
+**Text question color picker** — Green / Orange / Red radio buttons appear below each
+`text`-type textarea. Selected color saved as `response_data[key].color`. Report applies:
+- Green → `.answer-yes` (#198754)
+- Orange → `.answer-orange` (#fd7e14)
+- Red → `.answer-no` (#dc3545)
+- No selection → unstyled (black)
+
+**Conditional questions** — questions with `conditional_on` and `conditional_value` keys
+are hidden by default and revealed when the referenced parent question is answered with
+the required value (always `'yes'`). Nesting is supported (e.g., 5.2.1 depends on 5.2
+which depends on 5.1). The frontend JS runs a stabilizing loop that repeats until no
+visibility changes occur, handling arbitrary nesting depth.
+
+**Approval types** (defined in `approval/approval_types.py`, source: `examples/*_Approval.txt`):
+- `stage_discharge` — 16 sections, ~50 questions
+- `precipitation` — 10 sections, ~20 questions
+- `groundwater` — 11 sections, ~30 questions
+
+**Views:**
+- `index` — lists draft and completed approvals
+- `new_approval` — form: site number, approval type, period start/end
+- `approval_detail` — renders full checklist with autosave (600ms debounce, full
+  `response_data` JSON posted on each change); sticky header (title, dates, buttons,
+  progress bar stays visible while scrolling); "View Report" button opens report in new tab
+- `autosave` — POST endpoint, saves entire `response_data` JSON blob
+- `update_dates` — POST endpoint, saves edited `period_start`/`period_end` and redirects
+  back to the checklist; date pickers are inline in the sticky header
+- `toggle_complete` — flips status between draft/complete
+- `delete_approval` — deletes with confirmation
+- `approval_report` — read-only formatted report view; computes `ans_label`/`ans_class`
+  from the item's `options` list so answer colors always reflect `good_response` correctly
+- `export_docx` — generates and downloads a `.docx` file using `python-docx`; reuses the
+  same visibility/conditional logic as `approval_report`; color-codes `yn` answers
+  (green/red/gray) and `text` blocks (green/orange/red) using `RGBColor`
+
+**Checklist detail** (`approval/approval_detail.html`):
+- Sticky header contains title, approval type, inline date pickers (Save button posts to
+  `update_dates`), status badge, Mark Complete / Reopen, View Report, and Delete buttons,
+  plus a live progress bar
+- Progress bar updates live in the browser on every change — JS mirrors `completion_pct()`
+  logic (yn = has answer, date = has date, text = non-empty text) via a `QUESTIONS` array
+  rendered into the page from the server-side items list
+
+**Report view** (`approval/report.html`):
+- Sticky header contains site title, approval type/period/status on the left, and Back to
+  Checklist / Copy Text / Export Word buttons on the right
+- Renders all answered questions; conditional questions whose parent was not "yes" are
+  automatically omitted (visibility logic runs server-side in Python, mirroring the JS logic)
+- `yn` answer color driven by `ans_class` computed in view — green if answer matches a
+  good option, red if not, gray for N/A, light gray for unanswered
+- `text` block color driven by `r.color` saved with the response
+- Comment text appended inline after the answer in the same color
+- Unanswered questions shown in light gray as "— not answered"
+- **Copy Text** button — collects plain-text version of the report (section headers,
+  question numbers, answers, comments) and copies to clipboard via `navigator.clipboard`
+- **Export Word** button — links to `export_docx` view; downloads a `.docx` file
+
+**URL namespace:** `approval/` (no app namespace, named URLs: `approval_index`,
+`approval_new`, `approval_detail`, `approval_autosave`, `approval_toggle_complete`,
+`approval_delete`, `approval_update_dates`, `approval_report`, `approval_export_docx`)
+
+---
+
+### 6. ALERT2 Packet Parser (built)
 
 **Purpose:** Decode raw ALERT2 IND packet strings into human-readable form for
 field verification and troubleshooting.
 
-**Planned features — Phase 1 (single packet):**
-- Text input accepts a raw ALERT2 IND packet string
-- Decodes and displays all fields in a readable layout
+**Django app:** `alert2_parser/`
 
-**Planned features — Phase 2 (batch file upload):**
-- Upload a file containing one packet string per row
-- Each packet assessed as **valid** or **invalid** (with reason)
-- Results displayed as a table; clicking a row navigates to a detail view
-  showing the fully decoded packet fields
+**URL prefix:** `alert2-parser/` (named URLs: `alert2_parser_decode`, `alert2_parser_batch`)
 
-**Django app:** `alert2_parser` (new app, not yet created)
+**Navigation:** Accessed from the ALERT2 Dashboard index page (`alert2/index.html`),
+not from the home page. Two links appear below the "View All Sites Overview" button
+under a "Packet Tools" label — one for single-packet decode and one for batch upload.
 
----
+**Views:**
+- `decode_view` — single packet decoder; accepts GET (`?packet=` prefill) and POST;
+  auto-detects input format and renders hierarchical decoded output
+- `batch_view` — file upload (one packet per line); renders a results table with
+  valid/invalid badge, sensor summary, and a "Decode" button per row that posts the
+  raw line directly to `decode_view`
 
-### 6. Report Approval (planned)
+**Input formats — auto-detected by `decode_packet()` in `alert2_parser/decoder.py`:**
 
-**Purpose:** Structured review and approval workflow for completed station analysis
-reports. A hydrographer submits a report; a reviewer approves, rejects, or requests
-revisions.
+1. **AL22b binary frame** — hex string whose bytes start with `414C323262` ("AL22b").
+   This is the full binary IND API / Message API frame format (section 9.1 of the
+   IND API spec). Structure after the `AL22b` prefix:
+   - 1–2 byte extensible total-length field (bit 7 set → 2 bytes, 15-bit value)
+   - Sequence of top-level TLVs decoded by `decode_binary_frame()`:
+     - `0x00` ALERT2 Self-Report Protocol → value is the APDU, passed to `decode_apdu()`
+     - `0x0A` / `0x0B` Set / Get Parameter → nested parameter TLVs decoded by
+       `_decode_parameter_tlvs()`; parameter names from `IND_PARAMETER_NAMES` table
+     - `0x10` ALERT2 Data Envelope → Message API output; nested via
+       `_decode_data_envelope()` → `_decode_airlink_envelope()` + `_decode_mant_envelope()`
+       (MANT payload decoded as APDU)
+     - `0x02` Config & Control → recursively decoded nested IND API TLVs
+     - `0x78/0x79/0x7A/0x7B/0x70` Save / Query / Reset / Load Configuration, GPS Cycle
+       → no value, name shown only
+   - Example from spec section 6.1.2:
+     `414c3232621f0a0418021133001770020a0114000000682015100201081212032413220276`
+     → Set Parameter (IND Address = 4403) + Self-Report (Tipping Bucket + General Sensor)
 
-**Planned workflow:**
-1. Author submits completed `AnalysisReport` → creates an `ApprovalRequest`
-2. Reviewer is assigned (or self-selects)
-3. Reviewer reads report sections, leaves general or section-specific comments
-4. Reviewer approves or rejects with required comment
-5. On rejection, author revises and resubmits
+2. **IND CSV (AL22a)** — text lines starting with `AL2`; parsed by `decode_csv_lines()`.
+   Record types: AirLink, MANT, Sensor, ALERT CCN. MANT port-0 payloads are
+   automatically decoded as APDUs.
 
-**Key design decision pending:** Who can be a reviewer — any authenticated user,
-staff only, or a specific Django Group?
+3. **Hex MANT payload** — bare hex string (colon / space / dash separated or compact);
+   treated as a raw MANT Application PDU and passed directly to `decode_apdu()`.
+
+**Application PDU (APDU) decoder — `decode_apdu()`:**
+- Control byte: version (bits 0–1), timestamp present (bit 2), test flag (bit 3),
+  APDU ID (bits 4–6; 7 = disabled), extensibility (bit 7)
+- Optional 2-byte timestamp (seconds since last midnight or noon UTC)
+- TLV sensor report records (extensible type + length fields):
+  - Type 1 — General Sensor Report: `[sensor_id | F/L byte | value]` repeated
+  - Type 2 — Tipping Bucket Rain Gage Report: sensor_id + F/L + accumulator + 1-byte time offsets
+  - Type 3 — Multi-Sensor Report: flags byte drives which fixed fields are present
+    (AT 2B signed 0.1°F, RH 1B, BP 2B, WS 1B, WD 2B, PW 1B, Stage 2B signed 0.01ft, BV 1B)
+
+**Key lookup tables in `decoder.py`:**
+- `SENSOR_NAMES` / `SENSOR_UNITS` — standard sensor IDs 1–11 + 255
+- `MULTI_SENSOR_FIELDS` — bit definitions for Type 3 reports
+- `IND_COMMAND_NAMES` — top-level TLV command types (0x00–0x8081)
+- `IND_PARAMETER_NAMES` — parameter TLV types (0x18–0x8088) including Message API sub-TLVs
+- `CLOCK_STATUS_LABELS`, `AIRLINK_ERROR_LABELS`, `MANT_ERROR_LABELS`, `PORT_LABELS`
+
+**No database models** — the app is stateless; all decoding is done in memory in
+`alert2_parser/decoder.py`. No migrations needed beyond the empty `migrations/__init__.py`.
+
+**Protocol references** (in `examples/Alert/`):
+- `Alert2_IND_API_Ver2.0_FINAL_2020-6.pdf` — IND API Specification v2.0 (June 2020);
+  binary frame format in section 9.1, Message API TLVs in section 8.7, examples in sections 6–7
+- `ALERT2_Description_102511.pdf` — Application layer protocol (control byte, TLV report
+  types, sensor ID table, Multi-Sensor field table)
 
 ---
 
@@ -378,10 +547,47 @@ staff only, or a specific Django Group?
 5. ✅ Build Rating Developer (`rating_developer` app)
 6. Build shared `reports` app for saving/retrieving configurations
 7. ✅ Build `analysis` app — station analysis report authoring with AI assist,
-   precipitation data panel (gaps, estimated periods, calibrations, comparison sites)
-8. Build `alert2_parser` app — single-packet decoder, then batch file upload with
-   valid/invalid assessment table and per-packet detail view
-9. Build `approval` app — workflow logic, forms, and review UI
+   precipitation data panel (gaps, estimated periods, calibrations, comparison sites),
+   stage/discharge comparison sites, corrected extremes computation
+8. ✅ Build `alert2_parser` app — single-packet decoder (AL22b binary frame, AL22a CSV,
+   bare hex APDU) and batch file upload with valid/invalid assessment table
+9. ✅ Build `approval` app — standalone approval checklist with three report types,
+   conditional questions, autosave, formatted report view with copy-to-clipboard
+
+---
+
+## Performance Considerations
+
+Known inefficiencies that are not urgent but worth addressing before production or at
+scale:
+
+- **Cross-request data re-fetching (`analysis/views.py`)** — The USGS API is called
+  on every request with no caching. Loading a report page, clicking AI Assist, and
+  exporting either prompt each independently re-fetch the same precipitation or
+  stage/discharge data. The data-fetch logic for prompts is now consolidated into
+  `_get_precip_data(report)` (refactored) and `_stage_q_context(report)`, but no
+  TTL cache exists yet. Adding a short-lived server-side cache (e.g. Django's cache
+  framework with a 5–15 min TTL keyed on `(site_no, param, start, end)`) plus a
+  "Refresh Data" button would eliminate redundant external API round-trips.
+
+- **`_precip_context` and `_get_precip_data` both fetch comparison sites** — When
+  `report_detail` renders the page, `_precip_context` fetches comparison site data
+  from both the DB and the USGS API. `_get_precip_data` (used by prompt builders) also
+  queries the DB for comparison sites independently. These are separate requests so
+  there is no duplication within a single request, but if a view ever needs both the
+  chart context and the prompt data in the same request, there would be a double fetch.
+
+- **Stage/discharge prompt builders call `_stage_q_context` without comparison sites**
+  — `_build_all_sections_prompt` and `_build_copilot_prompt` call `_stage_q_context(report)`
+  with no comparison sites, so comparison discharge data does not appear in the AI prompt
+  even if comparison sites are configured. This is consistent but worth revisiting if
+  richer prompt context is desired.
+
+- **`fetch_measurements` in `rating_developer/usgs.py` fetches all historical measurements
+  on every call** — Called from `analysis/views.py` on every stage/discharge report page
+  load; no date filtering at the API level (filtering is done in Python). For sites with
+  many decades of measurements this could be slow. Consider adding date range parameters
+  to the OGC API call once the API supports them, or caching the result.
 
 ---
 
@@ -389,8 +595,8 @@ staff only, or a specific Django Group?
 
 - [ ] Flow-dependent time-of-travel — fixed offset for now, design for extensibility
 - [ ] Deployment target (server, cloud, local network)
-- [ ] Approval workflow — who is eligible to be a reviewer?
-- [ ] Approval workflow — notification mechanism (email, in-app, or both)?
+- [ ] Approval workflow — multi-user reviewer workflow not yet built (who can be a
+      reviewer? notification mechanism?) — current app is single-user checklist only
 - [ ] AI assist rate limiting — add per-user Django-level throttle before production
       (consider `django-ratelimit` on the `analysis_ai_assist_all` view)
 - [ ] Anthropic API billing — separate from Claude.ai Pro; requires credits at

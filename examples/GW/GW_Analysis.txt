@@ -1,0 +1,17 @@
+Extreme for Period of Analysis/Period of Record (Optional): Provide the maximum and minimum measured values for this period. State the period of record high and low for the site.
+
+Water-Level Fluctuations/Trends (Mandatory): State how the site water-level record is usually affected by artificial stresses (pumping, etc), earth tides, or other effects. Describe how the water level record during the analysis period fits into the site's trend.
+
+Missing Data (Mandatory): Provide dates and reasons for any gaps in the record.
+
+Measurements (Mandatory): List the number and dates of water level measurements that were made during the period and note any unusual circumstances about the measurements.
+
+Datum Corrections (Mandatory, if applicable): State if levels were run during the period and any noteworthy particulars about the leveling. Describe any movements of the measuring point (MP), land-surface datum (LSD), and reference marks (RMs) at the well. Describe how the surveyed effects were applied to the data.
+
+Water-Level Corrections (Mandatory, if applicable): Clearly describe corrections applied to the water levels collected during the period, including measuring point corrections.
+
+Hydrographic Comparison (Mandatory, if applicable): Provide sites used for hydrographic comparison, if applicable. Discuss how the comparison was done and document the results of the comparison. Where did the sites compare favorably, where did they compare poorly and why?
+
+Comments(Optional): Provide any pertinent remarks or comments for the record period that are not contained in the above sections.
+
+Special Notes (Optional): If the collection and maintenance of this record required any special (non-routine) trips during this period, state the date and purpose.

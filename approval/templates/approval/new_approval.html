@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}New Approval Checklist — HydroHelper{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-center align-items-start p-4">
+  <div class="card shadow-sm" style="width: 420px;">
+    <div class="card-body p-4">
+      <h5 class="card-title fw-bold mb-1">New Approval Checklist</h5>
+      <p class="text-muted small mb-4">Enter a site number and select the approval type and analysis period.</p>
+
+      {% if form.non_field_errors %}
+      <div class="alert alert-danger py-2">
+        {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+      </div>
+      {% endif %}
+
+      <form method="post">
+        {% csrf_token %}
+        {% for field in form %}
+        <div class="mb-3">
+          <label for="{{ field.id_for_label }}" class="form-label fw-semibold">{{ field.label }}</label>
+          {{ field }}
+          {% if field.errors %}
+          <div class="text-danger small mt-1">
+            {% for error in field.errors %}{{ error }}{% endfor %}
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+        <button type="submit" class="btn btn-primary w-100">Create Checklist</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

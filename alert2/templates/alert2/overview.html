@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}ALERT2 Overview — HydroHelper{% endblock %}
+
+{% block extra_style %}
+.pct-good { color: #198754; font-weight: 600; background-color: rgba(25, 135, 84, 0.12); }
+.pct-warn { color: #fd7e14; font-weight: 600; background-color: rgba(253, 126, 20, 0.12); }
+.pct-bad  { color: #dc3545; font-weight: 600; background-color: rgba(220, 53, 69, 0.12); }
+.site-header { background-color: #e9f5ee; }
+{% endblock %}
+
+{% block nav_extra %}
+<span class="text-white ms-3 fw-semibold">ALERT2 Overview</span>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3 px-4">
+
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <p class="text-muted small mb-0">7-day and 30-day scheduled transmit receipt rates. Data fetched live.</p>
+    <a href="{% url 'alert2_index' %}" class="btn btn-outline-secondary btn-sm">Single Site</a>
+  </div>
+
+  {% if site_rows %}
+  <div class="table-responsive">
+    <table class="table table-sm table-bordered table-hover align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Site</th>
+          <th>Sensor</th>
+          <th>Point ID</th>
+          <th>Schedule</th>
+          <th class="text-end">1-Day</th>
+          <th class="text-end">7-Day</th>
+          <th class="text-end">7-Day Rcvd/Exp</th>
+          <th class="text-end">30-Day</th>
+          <th class="text-end">30-Day Rcvd/Exp</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for site_row in site_rows %}
+          {% for sensor in site_row.sensor_rows %}
+          <tr {% if forloop.first %}class="site-header"{% endif %}>
+            {% if forloop.first %}
+            <td rowspan="{{ site_row.sensor_rows|length }}" class="site-header fw-semibold">
+              <a href="{% url 'alert2_site_data' site_no=site_row.site.site_no %}"
+                 class="text-decoration-none">{{ site_row.site.site_no }}</a>
+              <div class="text-muted fw-normal small">{{ site_row.site.name }}</div>
+            </td>
+            {% endif %}
+            <td>{{ sensor.label }}</td>
+            <td class="text-muted small">{{ sensor.point_locator }}</td>
+            <td class="text-muted small">
+              {% if site_row.site.transmit_interval_hours %}
+                Every {{ site_row.site.transmit_interval_hours }}h
+                at :{{ site_row.site.transmit_offset_minutes|stringformat:"02d" }}
+              {% else %}
+                <span class="text-warning">Not set</span>
+              {% endif %}
+            </td>
+            {% if sensor.error %}
+            <td colspan="5" class="text-danger small">{{ sensor.error }}</td>
+            {% elif sensor.summary_1d %}
+            <td class="text-end
+              {% if sensor.summary_1d.pct >= 90 %}pct-good
+              {% elif sensor.summary_1d.pct >= 70 %}pct-warn
+              {% else %}pct-bad{% endif %}">
+              {{ sensor.summary_1d.pct }}%
+            </td>
+            <td class="text-end
+              {% if sensor.summary_7d.pct >= 90 %}pct-good
+              {% elif sensor.summary_7d.pct >= 70 %}pct-warn
+              {% else %}pct-bad{% endif %}">
+              {{ sensor.summary_7d.pct }}%
+            </td>
+            <td class="text-end text-muted small">
+              {{ sensor.summary_7d.received }}/{{ sensor.summary_7d.expected }}
+            </td>
+            <td class="text-end
+              {% if sensor.summary_30d.pct >= 90 %}pct-good
+              {% elif sensor.summary_30d.pct >= 70 %}pct-warn
+              {% else %}pct-bad{% endif %}">
+              {{ sensor.summary_30d.pct }}%
+            </td>
+            <td class="text-end text-muted small">
+              {{ sensor.summary_30d.received }}/{{ sensor.summary_30d.expected }}
+            </td>
+            {% else %}
+            <td colspan="5" class="text-muted small">No schedule configured</td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="alert alert-info">No sites with Novastar point locators have been configured yet.</div>
+  {% endif %}
+
+</div>
+{% endblock %}

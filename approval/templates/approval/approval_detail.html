@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+
+{% block title %}Approval — {{ approval.site.site_no }} — HydroHelper{% endblock %}
+
+{% block extra_style %}
+.question-block:hover {
+  background-color: rgba(0,0,0,0.02);
+  border-radius: 4px;
+}
+.sticky-approval-header {
+  position: sticky;
+  top: 56px;
+  z-index: 100;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  padding: 0.75rem 0;
+  margin-bottom: 1.25rem;
+}
+.btn-outline-orange {
+  color: #fd7e14;
+  border-color: #fd7e14;
+}
+.btn-outline-orange:hover,
+.btn-check:checked + .btn-outline-orange {
+  background-color: #fd7e14;
+  border-color: #fd7e14;
+  color: #fff;
+}
+{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 860px;">
+
+  <!-- Back link (scrolls away) -->
+  <div class="mb-2 pt-2">
+    <a href="{% url 'approval_index' %}" class="text-muted small text-decoration-none">&larr; All Approvals</a>
+  </div>
+
+  <!-- Sticky header -->
+  <div class="sticky-approval-header">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+      <div>
+        <h4 class="fw-bold mb-1">
+          {{ approval.site.site_no }} — {{ approval.site.name }}
+        </h4>
+        <form method="post" action="{% url 'approval_update_dates' approval.pk %}" class="d-flex align-items-center gap-1 flex-wrap mt-1" id="dates-form">
+          {% csrf_token %}
+          <span class="text-muted small">{{ approval.get_approval_type_display }} &middot;</span>
+          <input type="date" name="period_start" value="{{ approval.period_start|date:'Y-m-d' }}"
+                 class="form-control form-control-sm" style="width:140px; font-size:0.82rem;">
+          <span class="text-muted small">to</span>
+          <input type="date" name="period_end" value="{{ approval.period_end|date:'Y-m-d' }}"
+                 class="form-control form-control-sm" style="width:140px; font-size:0.82rem;">
+          <button type="submit" class="btn btn-outline-secondary btn-sm" style="font-size:0.78rem;">Save</button>
+        </form>
+      </div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span id="save-status" class="text-muted small"></span>
+        {% if approval.status == 'complete' %}
+          <span class="badge bg-success">Complete</span>
+        {% else %}
+          <span class="badge bg-secondary">Draft</span>
+        {% endif %}
+        <form method="post" action="{% url 'approval_toggle_complete' approval.pk %}" class="d-inline">
+          {% csrf_token %}
+          {% if approval.status == 'complete' %}
+            <button type="submit" class="btn btn-outline-secondary btn-sm">Reopen</button>
+          {% else %}
+            <button type="submit" class="btn btn-success btn-sm">Mark Complete</button>
+          {% endif %}
+        </form>
+        <a href="{% url 'approval_report' approval.pk %}" target="_blank" class="btn btn-outline-primary btn-sm">View Report</a>
+        <form method="post" action="{% url 'approval_delete' approval.pk %}" class="d-inline"
+              onsubmit="return confirm('Delete this approval checklist? This cannot be undone.');">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Progress bar -->
+    <div class="mt-2">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="text-muted small">Completion</span>
+        <span class="text-muted small" id="completion-label">{{ completion_pct }}%</span>
+      </div>
+      <div class="progress" style="height: 8px;">
+        <div class="progress-bar bg-success" id="completion-bar" style="width: {{ completion_pct }}%;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Checklist -->
+  <div class="card shadow-sm">
+    <div class="card-body p-4">
+      {% for item in items %}
+
+        {% if item.type == 'section' %}
+        <div class="mt-4 mb-2">
+          <h6 class="fw-bold mb-0">{{ item.number }}. {{ item.title }}</h6>
+          <hr class="mt-1 mb-3">
+        </div>
+
+        {% elif item.type == 'yn' %}
+        <div class="question-block mb-3 ps-2{% if item.conditional_on %} conditional-block{% endif %}"
+             id="question-{{ item.key }}"
+             data-key="{{ item.key }}"
+             data-type="yn"
+             {% if item.conditional_on %}data-conditional-on="{{ item.conditional_on }}" data-conditional-value="{{ item.conditional_value }}" style="display:none;"{% endif %}>
+          <div class="d-flex align-items-start gap-3">
+            <span class="text-muted small fw-semibold mt-1" style="white-space:nowrap;">{{ item.number }}</span>
+            <div class="flex-grow-1">
+              <div class="small mb-2">{{ item.text }}</div>
+              {% if item.guidance %}
+              <div class="text-muted" style="font-size:0.78rem; margin-bottom:0.5rem;">{{ item.guidance }}</div>
+              {% endif %}
+              <div class="btn-group btn-group-sm mb-2" role="group">
+                {% for opt in item.options %}
+                <input type="radio" class="btn-check" name="{{ item.key }}" id="{{ item.key }}_{{ opt.value }}" value="{{ opt.value }}" autocomplete="off">
+                <label class="btn {% if opt.value == 'na' %}btn-outline-secondary{% elif opt.good %}btn-outline-success{% else %}btn-outline-danger{% endif %}" for="{{ item.key }}_{{ opt.value }}">{{ opt.label }}</label>
+                {% endfor %}
+              </div>
+              <textarea class="form-control form-control-sm comment-textarea" rows="2" placeholder="Comment…" style="font-size:0.82rem;"></textarea>
+            </div>
+          </div>
+        </div>
+
+        {% elif item.type == 'date' %}
+        <div class="question-block mb-3 ps-2{% if item.conditional_on %} conditional-block{% endif %}"
+             id="question-{{ item.key }}"
+             data-key="{{ item.key }}"
+             data-type="date"
+             {% if item.conditional_on %}data-conditional-on="{{ item.conditional_on }}" data-conditional-value="{{ item.conditional_value }}" style="display:none;"{% endif %}>
+          <div class="d-flex align-items-start gap-3">
+            <span class="text-muted small fw-semibold mt-1" style="white-space:nowrap;">{{ item.number }}</span>
+            <div class="flex-grow-1">
+              <div class="small mb-2">{{ item.text }}</div>
+              <input type="date" class="form-control form-control-sm date-input mb-2" style="max-width:180px;">
+              <textarea class="form-control form-control-sm comment-textarea" rows="2" placeholder="Comment…" style="font-size:0.82rem;"></textarea>
+            </div>
+          </div>
+        </div>
+
+        {% elif item.type == 'text' %}
+        <div class="question-block mb-3 ps-2"
+             id="question-{{ item.key }}"
+             data-key="{{ item.key }}"
+             data-type="text">
+          <div class="d-flex align-items-start gap-3">
+            <span class="text-muted small fw-semibold mt-1" style="white-space:nowrap;">{{ item.number }}</span>
+            <div class="flex-grow-1">
+              <div class="small mb-2">{{ item.text }}</div>
+              <textarea class="form-control form-control-sm text-textarea" rows="5" placeholder="Enter your assessment…" style="font-size:0.82rem;"></textarea>
+              <div class="btn-group btn-group-sm mt-1" role="group">
+                <input type="radio" class="btn-check text-color-radio" name="{{ item.key }}_color" id="{{ item.key }}_color_green" value="green" autocomplete="off">
+                <label class="btn btn-outline-success" for="{{ item.key }}_color_green">Green</label>
+                <input type="radio" class="btn-check text-color-radio" name="{{ item.key }}_color" id="{{ item.key }}_color_orange" value="orange" autocomplete="off">
+                <label class="btn btn-outline-orange" for="{{ item.key }}_color_orange">Orange</label>
+                <input type="radio" class="btn-check text-color-radio" name="{{ item.key }}_color" id="{{ item.key }}_color_red" value="red" autocomplete="off">
+                <label class="btn btn-outline-danger" for="{{ item.key }}_color_red">Red</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+const CSRF_TOKEN = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+const AUTOSAVE_URL = "{% url 'approval_autosave' approval.pk %}";
+const INITIAL_DATA = JSON.parse('{{ response_json|escapejs }}');
+
+// Question list for live progress computation (mirrors completion_pct() in Python)
+const QUESTIONS = [
+  {% for item in items %}{% if item.type == 'yn' or item.type == 'date' or item.type == 'text' %}
+  { key: "{{ item.key }}", type: "{{ item.type }}" },
+  {% endif %}{% endfor %}
+];
+
+// Pre-populate form from saved data
+function populateForm() {
+  document.querySelectorAll('.question-block').forEach(block => {
+    const key = block.dataset.key;
+    const type = block.dataset.type;
+    const saved = INITIAL_DATA[key] || {};
+    if (type === 'yn') {
+      const answer = saved.answer || '';
+      if (answer) {
+        const radio = block.querySelector(`input[value="${answer}"]`);
+        if (radio) radio.checked = true;
+      }
+      const comment = block.querySelector('.comment-textarea');
+      if (comment) comment.value = saved.comment || '';
+    } else if (type === 'date') {
+      const dateInput = block.querySelector('.date-input');
+      if (dateInput) dateInput.value = saved.date || '';
+      const comment = block.querySelector('.comment-textarea');
+      if (comment) comment.value = saved.comment || '';
+    } else if (type === 'text') {
+      const textarea = block.querySelector('.text-textarea');
+      if (textarea) textarea.value = saved.text || '';
+      if (saved.color) {
+        const colorRadio = block.querySelector(`input[name="${key}_color"][value="${saved.color}"]`);
+        if (colorRadio) colorRadio.checked = true;
+      }
+    }
+  });
+}
+
+// Conditional visibility — runs repeatedly until stable to handle nesting
+function updateVisibility() {
+  let changed = true;
+  while (changed) {
+    changed = false;
+    document.querySelectorAll('.conditional-block').forEach(block => {
+      const parentKey = block.dataset.conditionalOn;
+      const requiredValue = block.dataset.conditionalValue || 'yes';
+      const parentBlock = document.getElementById('question-' + parentKey);
+      let shouldShow = false;
+      if (parentBlock && parentBlock.style.display !== 'none') {
+        const checked = parentBlock.querySelector(`input[name="${parentKey}"]:checked`);
+        shouldShow = checked && checked.value === requiredValue;
+      }
+      const isShown = block.style.display !== 'none';
+      if (shouldShow && !isShown) { block.style.display = ''; changed = true; }
+      else if (!shouldShow && isShown) { block.style.display = 'none'; changed = true; }
+    });
+  }
+}
+
+// Collect all form data
+function collectData() {
+  const data = {};
+  document.querySelectorAll('.question-block').forEach(block => {
+    const key = block.dataset.key;
+    const type = block.dataset.type;
+    data[key] = {};
+    if (type === 'yn') {
+      const radio = block.querySelector(`input[name="${key}"]:checked`);
+      data[key].answer = radio ? radio.value : '';
+      const comment = block.querySelector('.comment-textarea');
+      data[key].comment = comment ? comment.value : '';
+    } else if (type === 'date') {
+      const dateInput = block.querySelector('.date-input');
+      data[key].date = dateInput ? dateInput.value : '';
+      const comment = block.querySelector('.comment-textarea');
+      data[key].comment = comment ? comment.value : '';
+    } else if (type === 'text') {
+      const textarea = block.querySelector('.text-textarea');
+      data[key].text = textarea ? textarea.value : '';
+      const colorRadio = block.querySelector(`input[name="${key}_color"]:checked`);
+      data[key].color = colorRadio ? colorRadio.value : '';
+    }
+  });
+  return data;
+}
+
+// Live progress bar
+function updateProgress() {
+  if (!QUESTIONS.length) return;
+  const data = collectData();
+  let answered = 0;
+  for (const q of QUESTIONS) {
+    const r = data[q.key] || {};
+    if (q.type === 'yn' && r.answer) answered++;
+    else if (q.type === 'date' && r.date) answered++;
+    else if (q.type === 'text' && r.text && r.text.trim()) answered++;
+  }
+  const pct = Math.round(answered / QUESTIONS.length * 100);
+  const bar = document.getElementById('completion-bar');
+  const label = document.getElementById('completion-label');
+  if (bar) bar.style.width = pct + '%';
+  if (label) label.textContent = pct + '%';
+}
+
+// Autosave with debounce
+const saveStatus = document.getElementById('save-status');
+let saveTimer = null;
+async function save() {
+  if (saveStatus) saveStatus.textContent = 'Saving…';
+  try {
+    const resp = await fetch(AUTOSAVE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+      body: JSON.stringify(collectData()),
+    });
+    if (saveStatus) saveStatus.textContent = resp.ok ? 'Saved' : 'Error saving';
+  } catch {
+    if (saveStatus) saveStatus.textContent = 'Error saving';
+  }
+}
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(save, 600);
+}
+
+// Init
+populateForm();
+updateVisibility();
+updateProgress();
+
+// Wire up events
+document.querySelectorAll('.question-block input[type=radio]').forEach(radio => {
+  radio.addEventListener('change', () => { updateVisibility(); updateProgress(); scheduleSave(); });
+});
+document.querySelectorAll('.question-block textarea, .question-block input[type=date]').forEach(el => {
+  el.addEventListener('input', () => { updateProgress(); scheduleSave(); });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Account — HydroHelper{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width: 540px;">
+  <h2 class="fw-bold mb-1">Account</h2>
+  <p class="text-muted mb-4">Manage your HydroHelper account.</p>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h6 class="text-uppercase text-muted fw-bold small mb-3">Profile</h6>
+      <dl class="row mb-0">
+        <dt class="col-sm-4">Username</dt>
+        <dd class="col-sm-8">{{ user.username }}</dd>
+        <dt class="col-sm-4">Name</dt>
+        <dd class="col-sm-8">{{ user.get_full_name|default:"—" }}</dd>
+        <dt class="col-sm-4">Email</dt>
+        <dd class="col-sm-8">{{ user.email|default:"—" }}</dd>
+        <dt class="col-sm-4">Member since</dt>
+        <dd class="col-sm-8">{{ user.date_joined|date:"N j, Y" }}</dd>
+      </dl>
+    </div>
+  </div>
+
+  {% if user.is_superuser %}
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h6 class="text-uppercase text-muted fw-bold small mb-3">Admin Tools</h6>
+      <div class="list-group list-group-flush">
+        <a href="{% url 'add_site' %}" class="list-group-item list-group-item-action px-0">
+          Add USGS Site to Database
+          <span class="text-muted small d-block">Look up a site by ID and cache its metadata.</span>
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <form method="post" action="{% url 'logout' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-outline-danger btn-sm">Log Out</button>
+  </form>
+</div>
+{% endblock %}

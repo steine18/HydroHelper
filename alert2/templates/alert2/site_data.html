@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}ALERT2 — {{ site_no }}{% if site_name %} {{ site_name }}{% endif %} — HydroHelper{% endblock %}
+
+{% block extra_style %}
+.table-sensor th { background-color: #f8f9fa; }
+.table-sensor td, .table-sensor th { white-space: nowrap; }
+.sensor-group-header { border-left: 2px solid #dee2e6; }
+td.sensor-col { border-left: 2px solid #dee2e6; }
+{% endblock %}
+
+{% block nav_extra %}
+<span class="text-white ms-3 fw-semibold">
+  {{ site_no }}{% if site_name %} — {{ site_name }}{% endif %}
+</span>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3 px-4">
+
+  <!-- Date range controls -->
+  <form method="get" action="" class="d-flex align-items-end gap-3 mb-3 flex-wrap">
+    <div>
+      <label class="form-label fw-semibold mb-1" for="start">Start Date</label>
+      <input type="date" id="start" name="start" class="form-control form-control-sm" value="{{ start }}">
+    </div>
+    <div>
+      <label class="form-label fw-semibold mb-1" for="end">End Date</label>
+      <input type="date" id="end" name="end" class="form-control form-control-sm" value="{{ end }}">
+    </div>
+    <div>
+      <button type="submit" class="btn btn-primary btn-sm">Update</button>
+    </div>
+    <div class="ms-auto d-flex gap-2">
+      {% if user.is_superuser %}
+      <button class="btn btn-outline-secondary btn-sm" type="button"
+              data-bs-toggle="collapse" data-bs-target="#addLocatorPanel">
+        + Add Point Locator
+      </button>
+      {% endif %}
+      <a href="{% url 'alert2_summary' site_no=site_no %}" class="btn btn-outline-secondary btn-sm">Summary</a>
+    </div>
+  </form>
+
+  <!-- Add Point Locator panel (superuser only) -->
+  {% if user.is_superuser %}
+  <div class="collapse mb-3" id="addLocatorPanel">
+    <div class="card card-body bg-light" style="max-width: 600px;">
+      <h6 class="fw-bold mb-3">Add Novastar Point Locator</h6>
+      <form method="post" action="">
+        {% csrf_token %}
+        <input type="hidden" name="start" value="{{ start }}">
+        <input type="hidden" name="end" value="{{ end }}">
+        <div class="row g-2 mb-2">
+          <div class="col-sm-4">
+            <label class="form-label small fw-semibold mb-1">Point Num ID <span class="text-danger">*</span></label>
+            <input type="text" name="point_locator" class="form-control form-control-sm" placeholder="e.g. 4174" required>
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label small fw-semibold mb-1">Parameter Type <span class="text-danger">*</span></label>
+            <input type="text" name="parameter_type" class="form-control form-control-sm" placeholder="e.g. Stage">
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label small fw-semibold mb-1">Label <span class="text-muted">(optional)</span></label>
+            <input type="text" name="label" class="form-control form-control-sm" placeholder="Display name">
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Add Locator</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+  {% endif %}
+
+  {% if sensors %}
+  <!-- Sensor point names + column toggles -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+    <div class="d-flex gap-4 flex-wrap">
+      {% for sensor in sensors %}
+      <div class="text-muted small">
+        <span class="fw-semibold text-dark">{{ sensor.label }}</span>
+        {% if sensor.point_name %} — {{ sensor.point_name }}{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="d-flex gap-3">
+      <div class="form-check form-check-inline mb-0">
+        <input class="form-check-input" type="checkbox" id="toggleRaw" checked>
+        <label class="form-check-label small" for="toggleRaw">Raw</label>
+      </div>
+      <div class="form-check form-check-inline mb-0">
+        <input class="form-check-input" type="checkbox" id="toggleScaled" checked>
+        <label class="form-check-label small" for="toggleScaled">Scaled</label>
+      </div>
+      <div class="form-check form-check-inline mb-0">
+        <input class="form-check-input" type="checkbox" id="toggleFlags" checked>
+        <label class="form-check-label small" for="toggleFlags">Flags</label>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if table_rows %}
+  <div class="table-responsive">
+    <table class="table table-sm table-bordered table-hover table-sensor">
+      <thead>
+        <tr>
+          <th rowspan="2" class="align-middle">Report Time</th>
+          {% for sensor in sensors %}
+          <th colspan="3" class="text-center sensor-group-header" data-group-header>
+            {{ sensor.label }} <span class="text-muted fw-normal small">(ID: {{ sensor.point_locator }})</span>
+          </th>
+          {% endfor %}
+        </tr>
+        <tr>
+          {% for sensor in sensors %}
+          <th class="sensor-group-header" data-col="raw">Raw</th>
+          <th data-col="scaled">Scaled</th>
+          <th data-col="flags">Flags</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in table_rows %}
+        <tr>
+          <td class="small">{{ row.report_time }}</td>
+          {% for val in row.values %}
+          <td class="text-end sensor-col" data-col="raw">{{ val.raw }}</td>
+          <td class="text-end" data-col="scaled">{{ val.scaled }}</td>
+          <td data-col="flags">{{ val.flags }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-muted small">{{ table_rows|length }} record{{ table_rows|length|pluralize }} returned.</p>
+
+  {% elif not error %}
+  <div class="alert alert-info">No data found for the selected date range.</div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+  function updateColumns() {
+    const showRaw    = document.getElementById('toggleRaw').checked;
+    const showScaled = document.getElementById('toggleScaled').checked;
+    const showFlags  = document.getElementById('toggleFlags').checked;
+
+    document.querySelectorAll('[data-col="raw"]').forEach(el => {
+      el.style.display = showRaw ? '' : 'none';
+    });
+    document.querySelectorAll('[data-col="scaled"]').forEach(el => {
+      el.style.display = showScaled ? '' : 'none';
+    });
+    document.querySelectorAll('[data-col="flags"]').forEach(el => {
+      el.style.display = showFlags ? '' : 'none';
+    });
+
+    const visibleCount = (showRaw ? 1 : 0) + (showScaled ? 1 : 0) + (showFlags ? 1 : 0);
+    document.querySelectorAll('[data-group-header]').forEach(th => {
+      th.colSpan = visibleCount || 1;
+    });
+  }
+
+  ['toggleRaw', 'toggleScaled', 'toggleFlags'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', updateColumns);
+  });
+</script>
+{% endblock %}

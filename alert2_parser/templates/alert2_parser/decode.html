@@ -1,0 +1,566 @@
+{% extends "base.html" %}
+
+{% block title %}ALERT2 Packet Decoder — HydroHelper{% endblock %}
+
+{% block extra_style %}
+.mono { font-family: 'Courier New', Courier, monospace; font-size: 0.85em; }
+.field-label { font-weight: 600; min-width: 200px; display: inline-block; color: #495057; }
+.sensor-badge { font-size: 0.78em; padding: 2px 7px; }
+.hex-raw { word-break: break-all; }
+.apdu-section { border-left: 3px solid var(--usgs-green); padding-left: 1rem; margin-bottom: 1rem; }
+.report-card { margin-bottom: 0.75rem; }
+{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 960px;">
+  <div class="d-flex align-items-center mb-1 gap-2">
+    <h4 class="mb-0 fw-bold">ALERT2 Packet Decoder</h4>
+    <a href="{% url 'alert2_parser_batch' %}" class="btn btn-outline-primary btn-sm ms-auto">Batch Upload</a>
+  </div>
+  <p class="text-muted small mb-4">Paste a hex MANT payload or one or more IND CSV lines (AL22a format).</p>
+
+  <form method="post" class="mb-4">
+    {% csrf_token %}
+    <div class="mb-3">
+      <textarea name="packet"
+                id="packet"
+                class="form-control mono"
+                rows="5"
+                placeholder="24:7E:87:04:01:11:22 — hex MANT payload&#10;or&#10;AL22a,2024-01-15 10:30:00,0,1234,09419800,MANT,... — IND CSV line"
+                style="resize: vertical;">{{ packet_input }}</textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Decode</button>
+    {% if packet_input %}
+    <a href="{% url 'alert2_parser_decode' %}" class="btn btn-outline-secondary ms-2">Clear</a>
+    {% endif %}
+  </form>
+
+  {% if error %}
+  <div class="alert alert-danger">
+    <strong>Decode error:</strong> {{ error }}
+  </div>
+  {% endif %}
+
+  {% if result and result.valid %}
+  <hr>
+  <div class="d-flex align-items-center gap-2 mb-3">
+    <span class="badge bg-success">Valid</span>
+    <span class="text-muted small">Format: {{ result.input_format }}</span>
+  </div>
+
+  {# ── AL22b BINARY FRAME path ── #}
+  {% if result.binary_frame %}
+  {% with frame=result.binary_frame %}
+  <div class="apdu-section">
+    <h6 class="fw-bold mb-2">AL22b Binary Frame</h6>
+    <div class="mb-2 small text-muted">Total payload: {{ frame.total_length }} bytes &nbsp;|&nbsp; <code class="mono hex-raw">{{ frame.raw_hex }}</code></div>
+
+    {% for tlv in frame.tlvs %}
+    <div class="card report-card">
+      <div class="card-header py-2 d-flex align-items-center gap-2">
+        <span class="fw-semibold">{{ tlv.type_name }}</span>
+        <span class="badge bg-light text-dark border mono sensor-badge">{{ tlv.type_hex }}</span>
+        <span class="badge bg-light text-dark border mono sensor-badge">{{ tlv.length }} bytes</span>
+        {% if tlv.error %}<span class="badge bg-danger ms-auto">Error</span>{% endif %}
+      </div>
+      <div class="card-body py-2">
+        {% if tlv.raw_hex %}
+        <div class="mb-2 text-muted small">Raw: <code class="mono">{{ tlv.raw_hex }}</code></div>
+        {% endif %}
+
+        {% if tlv.error %}
+        <div class="alert alert-danger py-1 px-2 small mb-0">{{ tlv.error }}</div>
+
+        {% elif tlv.parameters %}
+        {# Set / Get Parameter contents #}
+        <table class="table table-sm mb-0">
+          <thead class="table-light"><tr><th>Type</th><th>Parameter</th><th>Length</th><th class="text-end">Value</th><th>Raw hex</th></tr></thead>
+          <tbody>
+            {% for p in tlv.parameters %}
+            <tr>
+              <td class="mono small">{{ p.type_hex }}</td>
+              <td>{{ p.name }}</td>
+              <td class="mono">{{ p.length }}</td>
+              <td class="text-end mono">
+                {% if p.value_str %}{{ p.value_str }}
+                {% elif p.value_int is not None %}{{ p.value_int }}
+                {% else %}&mdash;{% endif %}
+              </td>
+              <td class="mono small text-muted">{{ p.raw_hex }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        {% elif tlv.apdu %}
+        {# Self-Report Protocol — decoded APDU #}
+        {% with apdu=tlv.apdu %}
+        <div class="mb-2 small">
+          <span class="field-label">Control byte</span><code class="mono">{{ apdu.control.byte }}</code>
+          — version {{ apdu.control.version }}{% if apdu.control.timestamp_present %}, timestamp present{% endif %}{% if apdu.control.test_flag %}, <span class="text-warning fw-bold">TEST</span>{% endif %}, APDU ID {{ apdu.control.apdu_id_display }}
+        </div>
+        {% if apdu.timestamp %}
+        <div class="mb-2 small"><span class="field-label">Timestamp</span>{{ apdu.timestamp.display }}</div>
+        {% endif %}
+        {% for rpt in apdu.reports %}
+        <div class="card report-card">
+          <div class="card-header py-1 small fw-semibold">Report Type {{ rpt.type }} — {{ rpt.type_name }} <span class="badge bg-light text-dark border mono sensor-badge">{{ rpt.length }} bytes</span></div>
+          <div class="card-body py-2">
+            {% if rpt.error %}<div class="alert alert-danger py-1 px-2 small mb-0">{{ rpt.error }}</div>
+            {% elif rpt.sensors %}
+            <table class="table table-sm mb-0">
+              <thead class="table-light"><tr><th>ID</th><th>Sensor</th><th>Format</th><th>Bytes</th><th class="text-end">Value</th><th>Unit</th></tr></thead>
+              <tbody>
+                {% for s in rpt.sensors %}
+                <tr><td class="mono">{{ s.sensor_id }}</td><td>{{ s.name }}</td><td class="text-muted small">{{ s.format_name }}</td><td class="mono">{{ s.byte_length }}</td>
+                  <td class="text-end mono">{% if s.raw_value is not None %}{{ s.raw_value }}{% else %}&mdash;{% endif %}</td><td class="text-muted small">{{ s.unit }}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% elif rpt.tipping_bucket %}
+            {% with tb=rpt.tipping_bucket %}
+            <div class="small mb-1">{{ tb.name }} (ID {{ tb.sensor_id }}) &mdash; Format: {{ tb.format_name }}, {{ tb.accumulator_bytes }} bytes &mdash; Accumulator: <strong>{{ tb.accumulator }}</strong> tips &mdash; {{ tb.tip_count }} individual tip{{ tb.tip_count|pluralize }}</div>
+            {% if tb.time_offsets_sec %}
+            <div class="small text-muted">Offsets before TX (seconds): {% for t in tb.time_offsets_sec %}<span class="badge bg-light text-dark border mono sensor-badge">{{ t }}</span> {% endfor %}</div>
+            {% endif %}
+            {% endwith %}
+            {% elif rpt.multi_sensor %}
+            {% with ms=rpt.multi_sensor %}
+            <table class="table table-sm mb-0">
+              <thead class="table-light"><tr><th>Sensor</th><th class="text-end">Value</th><th>Unit</th></tr></thead>
+              <tbody>{% for s in ms.sensors %}<tr><td>{{ s.name }}</td><td class="text-end mono">{{ s.value }}</td><td class="text-muted small">{{ s.unit }}</td></tr>{% endfor %}</tbody>
+            </table>
+            {% endwith %}
+            {% elif rpt.note %}<div class="text-muted small">{{ rpt.note }}</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+        {% endwith %}
+
+        {% elif tlv.data_envelope %}
+        {# ALERT2 Data Envelope — Message API output #}
+        {% with de=tlv.data_envelope %}
+        <table class="table table-sm table-borderless mb-2">
+          <tbody>
+            {% if de.agency_id %}<tr><td class="field-label">Agency</td><td>{{ de.agency_id }}</td></tr>{% endif %}
+            {% if de.ind_address %}<tr><td class="field-label">IND Address</td><td class="mono">{{ de.ind_address }}</td></tr>{% endif %}
+            {% if de.clock_status %}<tr><td class="field-label">Clock Status</td><td>{{ de.clock_status.value }} — {{ de.clock_status.label }}</td></tr>{% endif %}
+            {% if de.timestamp_hex %}<tr><td class="field-label">Timestamp (raw)</td><td class="mono">{{ de.timestamp_hex }}</td></tr>{% endif %}
+          </tbody>
+        </table>
+        {% if de.airlink_envelope %}
+        {% with al=de.airlink_envelope %}
+        <div class="card mb-2">
+          <div class="card-header py-1 small fw-semibold">AirLink PDU Envelope</div>
+          <div class="card-body py-2">
+            <table class="table table-sm table-borderless mb-0">
+              <tbody>
+                {% if al.frame_length is not None %}<tr><td class="field-label">Frame length</td><td>{{ al.frame_length }}</td></tr>{% endif %}
+                {% if al.total_sym_errors is not None %}<tr><td class="field-label">Symbol errors</td><td>{{ al.total_sym_errors }}</td></tr>{% endif %}
+                {% if al.noise_level is not None %}<tr><td class="field-label">Noise level</td><td>{{ al.noise_level }}</td></tr>{% endif %}
+                {% if al.fec_mode is not None %}<tr><td class="field-label">FEC mode</td><td>{{ al.fec_mode }}</td></tr>{% endif %}
+                {% if al.num_mant_pdus is not None %}<tr><td class="field-label">MANT PDUs decoded</td><td>{{ al.num_mant_pdus }}</td></tr>{% endif %}
+                {% if al.airlink_error %}<tr><td class="field-label">AirLink error</td><td>{% if al.airlink_error.code != 0 %}<span class="text-danger">{% endif %}{{ al.airlink_error.code }} — {{ al.airlink_error.label }}{% if al.airlink_error.code != 0 %}</span>{% endif %}</td></tr>{% endif %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endwith %}
+        {% endif %}
+        {% if de.mant_envelope %}
+        {% with me=de.mant_envelope %}
+        <div class="card mb-2">
+          <div class="card-header py-1 small fw-semibold">MANT PDU Envelope</div>
+          <div class="card-body py-2">
+            <table class="table table-sm table-borderless mb-2">
+              <tbody>
+                {% if me.authentic is not None %}<tr><td class="field-label">Authenticated</td><td>{% if me.authentic %}Yes{% else %}No{% endif %}</td></tr>{% endif %}
+                {% if me.header_hex %}<tr><td class="field-label">MANT Header</td><td class="mono">{{ me.header_hex }}</td></tr>{% endif %}
+                {% if me.payload_hex %}<tr><td class="field-label">MANT Payload</td><td class="mono hex-raw">{{ me.payload_hex }}</td></tr>{% endif %}
+                {% if me.mant_error %}<tr><td class="field-label">MANT Error</td><td>{{ me.mant_error.code }} — {{ me.mant_error.label }}</td></tr>{% endif %}
+              </tbody>
+            </table>
+            {% if me.apdu %}
+            {% with apdu=me.apdu %}
+            <div style="border-left:3px solid var(--usgs-green); padding-left:1rem;">
+              <div class="small mb-1">Control byte <code class="mono">{{ apdu.control.byte }}</code> — APDU ID {{ apdu.control.apdu_id_display }}{% if apdu.control.test_flag %} <span class="badge bg-warning text-dark">TEST</span>{% endif %}{% if apdu.control.timestamp_present %}, timestamp present{% endif %}</div>
+              {% for rpt in apdu.reports %}
+              <div class="card report-card">
+                <div class="card-header py-1 small fw-semibold">{{ rpt.type_name }} <span class="mono badge bg-light text-dark border">{{ rpt.length }}B</span></div>
+                <div class="card-body py-2">
+                  {% if rpt.sensors %}
+                  <table class="table table-sm mb-0"><thead class="table-light"><tr><th>ID</th><th>Sensor</th><th class="text-end">Value</th><th>Unit</th></tr></thead>
+                  <tbody>{% for s in rpt.sensors %}<tr><td class="mono">{{ s.sensor_id }}</td><td>{{ s.name }}</td><td class="text-end mono">{{ s.raw_value }}</td><td class="text-muted small">{{ s.unit }}</td></tr>{% endfor %}</tbody></table>
+                  {% elif rpt.tipping_bucket %}{% with tb=rpt.tipping_bucket %}<div class="small">{{ tb.name }} — Accum: {{ tb.accumulator }}, {{ tb.tip_count }} tips</div>{% endwith %}
+                  {% elif rpt.multi_sensor %}{% with ms=rpt.multi_sensor %}<table class="table table-sm mb-0"><thead class="table-light"><tr><th>Sensor</th><th class="text-end">Value</th><th>Unit</th></tr></thead><tbody>{% for s in ms.sensors %}<tr><td>{{ s.name }}</td><td class="text-end mono">{{ s.value }}</td><td class="text-muted small">{{ s.unit }}</td></tr>{% endfor %}</tbody></table>{% endwith %}
+                  {% elif rpt.error %}<div class="text-danger small">{{ rpt.error }}</div>{% endif %}
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            {% endwith %}
+            {% elif me.apdu_error %}
+            <div class="alert alert-warning py-1 px-2 small">APDU decode error: {{ me.apdu_error }}</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endwith %}
+        {% endif %}
+        {% endwith %}
+
+        {% elif tlv.nested_tlvs %}
+        {# Config & Control nested TLVs #}
+        <div class="small text-muted mb-1">Contains nested IND API TLVs:</div>
+        {% for nt in tlv.nested_tlvs %}
+        <div class="mb-1 ps-2 border-start">
+          <span class="fw-semibold small">{{ nt.type_name }}</span>
+          <span class="badge bg-light text-dark border mono sensor-badge">{{ nt.type_hex }}</span>
+          <span class="badge bg-light text-dark border mono sensor-badge">{{ nt.length }} bytes</span>
+          {% if nt.parameters %}
+          <div class="ps-2 mt-1">
+            {% for p in nt.parameters %}<div class="small"><code class="mono">{{ p.type_hex }}</code> {{ p.name }}: {% if p.value_str %}{{ p.value_str }}{% elif p.value_int is not None %}{{ p.value_int }}{% else %}<span class="text-muted">{{ p.raw_hex }}</span>{% endif %}</div>{% endfor %}
+          </div>
+          {% elif nt.raw_hex %}
+          <code class="mono small ms-2 text-muted">{{ nt.raw_hex }}</code>
+          {% endif %}
+        </div>
+        {% endfor %}
+
+        {% else %}
+        {# Minimal display for commands with no parsed content #}
+        {% if not tlv.raw_hex %}<div class="text-muted small">No value (length 0)</div>{% endif %}
+        {% endif %}
+
+      </div>
+    </div>
+    {% empty %}
+    <div class="text-muted small">No TLVs found in frame.</div>
+    {% endfor %}
+  </div>
+  {% endwith %}
+
+  {# ── HEX PAYLOAD path ── #}
+  {% elif result.apdu %}
+  {% with apdu=result.apdu %}
+
+  <div class="apdu-section">
+    <h6 class="fw-bold mb-2">Application PDU</h6>
+    <div class="mb-1">
+      <span class="field-label">Total bytes</span>
+      <span>{{ apdu.total_bytes }}</span>
+    </div>
+    <div class="mb-2">
+      <span class="field-label">Raw hex</span>
+      <code class="mono hex-raw">{{ apdu.raw_hex }}</code>
+    </div>
+
+    {% if apdu.warnings %}
+    <div class="alert alert-warning py-1 px-2 small mb-2">
+      {% for w in apdu.warnings %}⚠ {{ w }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+    </div>
+    {% endif %}
+
+    {# Control byte #}
+    {% with ctrl=apdu.control %}
+    <div class="card mb-3">
+      <div class="card-header py-2 fw-semibold">Control Byte — <code class="mono">{{ ctrl.byte }}</code></div>
+      <div class="card-body py-2">
+        <table class="table table-sm table-borderless mb-0">
+          <tbody>
+            <tr><td class="field-label">Version</td><td>{{ ctrl.version }}</td></tr>
+            <tr><td class="field-label">Timestamp present</td><td>{% if ctrl.timestamp_present %}<span class="badge bg-secondary">Yes</span>{% else %}No{% endif %}</td></tr>
+            <tr><td class="field-label">Test flag</td><td>{% if ctrl.test_flag %}<span class="badge bg-warning text-dark">TEST</span>{% else %}No{% endif %}</td></tr>
+            <tr><td class="field-label">APDU ID</td><td>{{ ctrl.apdu_id_display }}</td></tr>
+            <tr><td class="field-label">Extensibility bit</td><td>{% if ctrl.extensibility %}Yes{% else %}No{% endif %}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endwith %}
+
+    {# Optional timestamp #}
+    {% if apdu.timestamp %}
+    <div class="card mb-3">
+      <div class="card-header py-2 fw-semibold">Timestamp</div>
+      <div class="card-body py-2">
+        <table class="table table-sm table-borderless mb-0">
+          <tbody>
+            <tr><td class="field-label">Raw seconds</td><td>{{ apdu.timestamp.raw_seconds }}</td></tr>
+            <tr><td class="field-label">Display</td><td>{{ apdu.timestamp.display }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    {# TLV reports #}
+    {% for rpt in apdu.reports %}
+    <div class="card report-card">
+      <div class="card-header py-2 d-flex align-items-center gap-2">
+        <span class="fw-semibold">Report Type {{ rpt.type }} — {{ rpt.type_name }}</span>
+        <span class="badge bg-light text-dark border mono sensor-badge">{{ rpt.length }} bytes</span>
+        {% if rpt.error %}<span class="badge bg-danger ms-auto">Error</span>{% endif %}
+      </div>
+      <div class="card-body py-2">
+        <div class="mb-2 text-muted small">
+          Raw: <code class="mono">{{ rpt.raw_hex }}</code>
+        </div>
+
+        {% if rpt.error %}
+        <div class="alert alert-danger py-1 px-2 small mb-0">{{ rpt.error }}</div>
+
+        {% elif rpt.sensors %}
+        <table class="table table-sm mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>ID</th><th>Sensor</th><th>Format</th><th>Bytes</th><th class="text-end">Value</th><th>Unit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in rpt.sensors %}
+            <tr>
+              <td class="mono">{{ s.sensor_id }}</td>
+              <td>{{ s.name }}</td>
+              <td class="text-muted small">{{ s.format_name }}</td>
+              <td class="mono">{{ s.byte_length }}</td>
+              <td class="text-end mono">{% if s.raw_value is not None %}{{ s.raw_value }}{% else %}&mdash;{% endif %}</td>
+              <td class="text-muted small">{{ s.unit }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        {% elif rpt.tipping_bucket %}
+        {% with tb=rpt.tipping_bucket %}
+        <table class="table table-sm mb-2">
+          <tbody>
+            <tr><td class="field-label">Sensor</td><td>{{ tb.name }} (ID {{ tb.sensor_id }})</td></tr>
+            <tr><td class="field-label">Format</td><td>{{ tb.format_name }}, {{ tb.accumulator_bytes }} bytes</td></tr>
+            <tr><td class="field-label">Accumulator</td><td class="mono">{{ tb.accumulator }} tips</td></tr>
+            <tr><td class="field-label">Individual tips</td><td>{{ tb.tip_count }}</td></tr>
+          </tbody>
+        </table>
+        {% if tb.time_offsets_sec %}
+        <div class="small text-muted">
+          Tip offsets (seconds before TX):
+          {% for t in tb.time_offsets_sec %}
+          <span class="badge bg-light text-dark border mono sensor-badge">{{ t }}s</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        {% elif rpt.multi_sensor %}
+        {% with ms=rpt.multi_sensor %}
+        <div class="mb-2 small text-muted">Flags byte: <code class="mono">{{ ms.flags_byte }}</code></div>
+        <table class="table table-sm mb-0">
+          <thead class="table-light">
+            <tr><th>Bit</th><th>Sensor</th><th class="text-end">Raw</th><th class="text-end">Value</th><th>Unit</th><th>Resolution</th></tr>
+          </thead>
+          <tbody>
+            {% for s in ms.sensors %}
+            <tr>
+              <td class="mono">{{ s.bit }}</td>
+              <td>{{ s.name }}</td>
+              <td class="text-end mono">{{ s.raw_value }}</td>
+              <td class="text-end mono">{{ s.value }}</td>
+              <td class="text-muted small">{{ s.unit }}</td>
+              <td class="text-muted small">{{ s.resolution }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% endwith %}
+
+        {% elif rpt.note %}
+        <div class="text-muted small">{{ rpt.note }}</div>
+        {% endif %}
+
+      </div>
+    </div>
+    {% empty %}
+    <div class="text-muted small">No TLV report records found in payload.</div>
+    {% endfor %}
+
+  </div>{# /apdu-section #}
+  {% endwith %}
+
+  {# ── CSV path ── #}
+  {% elif result.lines %}
+  {% for line in result.lines %}
+  {% if line.skip %}
+  <div class="text-muted small mb-2">Skipped non-AL2 line: <code class="mono">{{ line.raw|truncatechars:120 }}</code></div>
+  {% elif line.error %}
+  <div class="alert alert-danger small mb-2">Parse error: {{ line.error }}<br><code class="mono">{{ line.raw|truncatechars:120 }}</code></div>
+  {% else %}
+
+  <div class="card mb-3">
+    <div class="card-header py-2 d-flex align-items-center gap-2">
+      <span class="fw-semibold">{{ line.message_type }} record</span>
+      <span class="badge bg-light text-dark border small">{{ line.prefix }}</span>
+      {% if line.has_error %}<span class="badge bg-danger ms-auto">Error</span>{% endif %}
+    </div>
+    <div class="card-body py-2">
+
+      {# Common header fields #}
+      <table class="table table-sm table-borderless mb-2">
+        <tbody>
+          <tr><td class="field-label">Decode timestamp</td><td>{{ line.decode_timestamp }}</td></tr>
+          <tr><td class="field-label">Clock status</td><td>{{ line.time_sync_raw }}{% if line.time_sync_label %} — {{ line.time_sync_label }}{% endif %}</td></tr>
+          <tr><td class="field-label">Agency</td><td class="mono">{{ line.agency }}</td></tr>
+          <tr><td class="field-label">IND address</td><td class="mono">{{ line.ind_address }}</td></tr>
+        </tbody>
+      </table>
+
+      {# AirLink-specific #}
+      {% if line.message_type == 'AirLink' %}
+      <table class="table table-sm mb-0">
+        <tbody>
+          <tr><td class="field-label">Error</td><td>{% if line.has_error %}<span class="text-danger">{{ line.error_label }}</span>{% else %}{{ line.error_label }}{% endif %}</td></tr>
+          <tr><td class="field-label">Frame length</td><td>{{ line.frame_length }}</td></tr>
+          <tr><td class="field-label">Symbol errors</td><td>{{ line.total_sym_errors }}</td></tr>
+          <tr><td class="field-label">FEC mode</td><td>{{ line.fec_mode }}</td></tr>
+          <tr><td class="field-label">Noise level</td><td>{{ line.noise_level }}</td></tr>
+          {% if line.raw_data %}
+          <tr><td class="field-label">Raw data</td><td><code class="mono hex-raw">{{ line.raw_data }}</code></td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+      {% endif %}
+
+      {# MANT-specific #}
+      {% if line.message_type == 'MANT' %}
+      <table class="table table-sm mb-2">
+        <tbody>
+          <tr><td class="field-label">Error</td><td>{% if line.has_error %}<span class="text-danger">{{ line.error_label }}</span>{% else %}{{ line.error_label }}{% endif %}</td></tr>
+          <tr><td class="field-label">Protocol</td><td>{{ line.protocol_id }} — {{ line.protocol_label }}</td></tr>
+          <tr><td class="field-label">Port</td><td>{{ line.port }} — {{ line.port_label }}</td></tr>
+          <tr><td class="field-label">Source address</td><td class="mono">{{ line.source_address }}</td></tr>
+          <tr><td class="field-label">Destination address</td><td class="mono">{{ line.destination_address }}</td></tr>
+          <tr><td class="field-label">PDU ID</td><td>{{ line.pdu_id }}</td></tr>
+          <tr><td class="field-label">Hop limit</td><td>{{ line.hop_limit_display }}</td></tr>
+          <tr><td class="field-label">ACK</td><td>{{ line.ack }}</td></tr>
+          <tr><td class="field-label">Authenticated</td><td>{{ line.mant_authentic }}</td></tr>
+          {% if line.path %}
+          <tr><td class="field-label">Path</td><td class="mono">{{ line.path }}</td></tr>
+          {% endif %}
+          {% if line.payload %}
+          <tr><td class="field-label">Payload ({{ line.payload_length }} bytes)</td><td><code class="mono hex-raw">{{ line.payload }}</code></td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+
+      {# Decoded APDU for port 0 #}
+      {% if line.decoded_apdu %}
+      {% with apdu=line.decoded_apdu %}
+      <div class="apdu-section mt-3">
+        <h6 class="fw-semibold mb-2">Decoded Application PDU</h6>
+
+        {% with ctrl=apdu.control %}
+        <div class="mb-2">
+          <span class="field-label">Control byte</span><code class="mono">{{ ctrl.byte }}</code>
+          — version {{ ctrl.version }},
+          {% if ctrl.timestamp_present %}timestamp present, {% endif %}
+          {% if ctrl.test_flag %}<span class="text-warning fw-bold">TEST</span>, {% endif %}
+          APDU ID {{ ctrl.apdu_id_display }}
+        </div>
+        {% endwith %}
+
+        {% if apdu.timestamp %}
+        <div class="mb-2">
+          <span class="field-label">Timestamp</span>{{ apdu.timestamp.display }}
+        </div>
+        {% endif %}
+
+        {% for rpt in apdu.reports %}
+        <div class="card report-card">
+          <div class="card-header py-1 small fw-semibold">
+            Report Type {{ rpt.type }} — {{ rpt.type_name }}
+            <span class="badge bg-light text-dark border mono sensor-badge">{{ rpt.length }} bytes</span>
+          </div>
+          <div class="card-body py-2">
+            {% if rpt.error %}
+            <div class="alert alert-danger py-1 px-2 small mb-0">{{ rpt.error }}</div>
+            {% elif rpt.sensors %}
+            <table class="table table-sm mb-0">
+              <thead class="table-light"><tr><th>ID</th><th>Sensor</th><th class="text-end">Value</th><th>Unit</th></tr></thead>
+              <tbody>
+                {% for s in rpt.sensors %}
+                <tr>
+                  <td class="mono">{{ s.sensor_id }}</td>
+                  <td>{{ s.name }}</td>
+                  <td class="text-end mono">{% if s.raw_value is not None %}{{ s.raw_value }}{% else %}&mdash;{% endif %}</td>
+                  <td class="text-muted small">{{ s.unit }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% elif rpt.tipping_bucket %}
+            {% with tb=rpt.tipping_bucket %}
+            <div class="small">{{ tb.name }} (ID {{ tb.sensor_id }}) — Accumulator: <strong>{{ tb.accumulator }}</strong> tips, {{ tb.tip_count }} individual tips</div>
+            {% if tb.time_offsets_sec %}
+            <div class="small text-muted mt-1">Offsets (s before TX): {% for t in tb.time_offsets_sec %}<span class="badge bg-light text-dark border mono sensor-badge">{{ t }}</span> {% endfor %}</div>
+            {% endif %}
+            {% endwith %}
+            {% elif rpt.multi_sensor %}
+            {% with ms=rpt.multi_sensor %}
+            <table class="table table-sm mb-0">
+              <thead class="table-light"><tr><th>Sensor</th><th class="text-end">Value</th><th>Unit</th></tr></thead>
+              <tbody>
+                {% for s in ms.sensors %}
+                <tr><td>{{ s.name }}</td><td class="text-end mono">{{ s.value }}</td><td class="text-muted small">{{ s.unit }}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% endwith %}
+            {% elif rpt.note %}
+            <div class="text-muted small">{{ rpt.note }}</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>{# /apdu-section #}
+      {% endwith %}
+      {% elif line.apdu_error %}
+      <div class="alert alert-warning py-1 px-2 small mt-2">APDU decode error: {{ line.apdu_error }}</div>
+      {% elif line.apdu_note %}
+      <div class="text-muted small mt-2">{{ line.apdu_note }}</div>
+      {% endif %}
+      {% endif %}{# /MANT #}
+
+      {# Sensor-specific #}
+      {% if line.message_type == 'Sensor' %}
+      <table class="table table-sm mb-0">
+        <tbody>
+          <tr><td class="field-label">Reading timestamp</td><td>{{ line.reading_timestamp }}</td></tr>
+          <tr><td class="field-label">Site address</td><td class="mono">{{ line.site_address }}</td></tr>
+          <tr><td class="field-label">Sensor ID</td><td>{{ line.sensor_id }}{% if line.sensor_name %} — {{ line.sensor_name }}{% endif %}</td></tr>
+          <tr><td class="field-label">Value</td><td class="mono">{{ line.value }}{% if line.sensor_unit %} {{ line.sensor_unit }}{% endif %}</td></tr>
+        </tbody>
+      </table>
+      {% endif %}
+
+      {# ALERT CCN-specific #}
+      {% if line.message_type == 'ALERT CCN' %}
+      <table class="table table-sm mb-0">
+        <tbody>
+          <tr><td class="field-label">ALERT timestamp</td><td>{{ line.alert_timestamp }}</td></tr>
+          <tr><td class="field-label">ALERT ID</td><td class="mono">{{ line.alert_id }}</td></tr>
+          <tr><td class="field-label">ALERT value</td><td class="mono">{{ line.alert_value }}</td></tr>
+        </tbody>
+      </table>
+      {% endif %}
+
+    </div>
+  </div>
+  {% endif %}
+  {% endfor %}
+  {% endif %}{# /result.lines #}
+
+  {% elif result and not result.valid %}
+  {# Already handled by the error block above #}
+  {% endif %}
+
+</div>
+{% endblock %}

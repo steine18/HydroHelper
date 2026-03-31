@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}Approval Report — {{ approval.site.site_no }} — HydroHelper{% endblock %}
+
+{% block extra_style %}
+.answer-yes    { color: #198754; font-weight: 600; }
+.answer-no     { color: #dc3545; font-weight: 600; }
+.answer-na     { color: #6c757d; font-weight: 600; }
+.answer-orange { color: #fd7e14; font-weight: 600; }
+.answer-blank  { color: #adb5bd; font-style: italic; }
+.report-comment { color: inherit; font-weight: normal; }
+.sticky-report-header {
+  position: sticky;
+  top: 56px;
+  z-index: 100;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  padding: 0.75rem 0;
+  margin-bottom: 1.25rem;
+}
+{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 860px;">
+
+  <!-- Sticky header -->
+  <div class="sticky-report-header">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+      <div>
+        <h4 class="fw-bold mb-1">{{ approval.site.site_no }} — {{ approval.site.name }}</h4>
+        <div class="text-muted small">
+          {{ approval.get_approval_type_display }} Approval &middot;
+          {{ approval.period_start }} to {{ approval.period_end }}
+          {% if approval.status == 'complete' %}
+          &middot; <span class="text-success fw-semibold">Complete</span>
+          {% else %}
+          &middot; <span class="text-secondary fw-semibold">Draft</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="d-flex gap-2 align-items-center flex-wrap">
+        <a href="{% url 'approval_detail' approval.pk %}" class="btn btn-outline-secondary btn-sm">&larr; Back to Checklist</a>
+        <button id="copy-btn" class="btn btn-outline-secondary btn-sm">Copy Text</button>
+        <a href="{% url 'approval_export_docx' approval.pk %}" class="btn btn-outline-primary btn-sm">Export Word</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body p-4">
+      {% for item in report_items %}
+
+        {% if item.type == 'section' %}
+        <div class="mt-4 mb-2 report-section"
+             data-title="{{ item.number }}. {{ item.title }}">
+          <h6 class="fw-bold mb-0">{{ item.number }}. {{ item.title }}</h6>
+          <hr class="mt-1 mb-3">
+        </div>
+
+        {% elif item.type == 'yn' %}
+        {% with r=item.response %}
+        <div class="mb-3 ps-2 report-question"
+             data-number="{{ item.number }}"
+             data-text="{{ item.text }}"
+             data-answer="{{ r.answer }}"
+             data-comment="{{ r.comment }}">
+          <div class="d-flex align-items-start gap-3">
+            <span class="text-muted small fw-semibold mt-1" style="white-space:nowrap;">{{ item.number }}</span>
+            <div class="flex-grow-1">
+              <div class="small mb-1">{{ item.text }}</div>
+              <div class="small">
+                {% if r.answer %}
+                  <span class="{{ r.ans_class }}">{{ r.ans_label }}{% if r.comment %}, <span class="report-comment">{{ r.comment }}</span>{% endif %}</span>
+                {% else %}
+                  <span class="answer-blank">— not answered{% if r.comment %}, <span class="report-comment">{{ r.comment }}</span>{% endif %}</span>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endwith %}
+
+        {% elif item.type == 'date' %}
+        {% with r=item.response %}
+        <div class="mb-3 ps-2 report-question"
+             data-number="{{ item.number }}"
+             data-text="{{ item.text }}"
+             data-date="{{ r.date }}"
+             data-comment="{{ r.comment }}">
+          <div class="d-flex align-items-start gap-3">
+            <span class="text-muted small fw-semibold mt-1" style="white-space:nowrap;">{{ item.number }}</span>
+            <div class="flex-grow-1">
+              <div class="small mb-1">{{ item.text }}</div>
+              <div class="small">
+                {% if r.date %}
+                  <span class="fw-semibold">{{ r.date }}</span>
+                  {% if r.comment %} &mdash; <span class="text-muted">{{ r.comment }}</span>{% endif %}
+                {% else %}
+                  <span class="answer-blank">— not answered{% if r.comment %}, <span class="text-muted">{{ r.comment }}</span>{% endif %}</span>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endwith %}
+
+        {% elif item.type == 'text' %}
+        {% with r=item.response %}
+        <div class="mb-3 ps-2 report-question"
+             data-number="{{ item.number }}"
+             data-text="{{ item.text }}"
+             data-body="{{ r.text }}">
+          <div class="d-flex align-items-start gap-3">
+            <span class="text-muted small fw-semibold mt-1" style="white-space:nowrap;">{{ item.number }}</span>
+            <div class="flex-grow-1">
+              <div class="small fw-semibold mb-1">{{ item.text }}</div>
+              {% if r.text %}
+              <div class="small {% if r.color == 'green' %}answer-yes{% elif r.color == 'orange' %}answer-orange{% elif r.color == 'red' %}answer-no{% endif %}" style="white-space: pre-wrap;">{{ r.text }}</div>
+              {% else %}
+              <div class="small answer-blank">— not answered</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endwith %}
+
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+document.getElementById('copy-btn').addEventListener('click', function () {
+  const lines = [];
+
+  lines.push("{{ approval.site.site_no }} — {{ approval.site.name|escapejs }}");
+  lines.push("{{ approval.get_approval_type_display }} Approval — {{ approval.period_start }} to {{ approval.period_end }}");
+
+  document.querySelectorAll('.report-section, .report-question').forEach(el => {
+    if (el.classList.contains('report-section')) {
+      lines.push('');
+      const title = el.dataset.title;
+      lines.push(title);
+      lines.push('-'.repeat(title.length));
+    } else {
+      const num = el.dataset.number;
+      const text = el.dataset.text;
+
+      if ('body' in el.dataset) {
+        // text type
+        lines.push('');
+        lines.push(`${num}. ${text}`);
+        lines.push(el.dataset.body.trim() || '(not answered)');
+      } else if ('date' in el.dataset) {
+        // date type
+        const date = el.dataset.date || '(not answered)';
+        const comment = el.dataset.comment;
+        lines.push(`${num}. ${text} ${date}${comment ? ' — ' + comment : ''}`);
+      } else {
+        // yn type
+        const answerMap = {yes: 'Yes', no: 'No', na: 'N/A', '': '(not answered)'};
+        const answer = answerMap[el.dataset.answer] || '(not answered)';
+        const comment = el.dataset.comment;
+        lines.push(`${num}. ${text}`);
+        lines.push(`    ${answer}${comment ? ': ' + comment : ''}`);
+      }
+    }
+  });
+
+  navigator.clipboard.writeText(lines.join('\n')).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy Text', 2000);
+  });
+});
+</script>
+{% endblock %}

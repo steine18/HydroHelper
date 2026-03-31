@@ -49,6 +49,8 @@ INSTALLED_APPS = [
     'sites',
     'analysis',
     'rating_developer',
+    'approval',
+    'alert2_parser',
     # django-allauth
     'allauth',
     'allauth.account',

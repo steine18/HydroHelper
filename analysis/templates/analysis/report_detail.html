@@ -1,0 +1,896 @@
+{% extends "base.html" %}
+
+{% block title %}Analysis Report — {{ report.site.site_no }} — HydroHelper{% endblock %}
+
+{% block extra_style %}
+  .section-textarea { font-family: inherit; resize: vertical; min-height: 160px; }
+  .autosave-status { min-height: 1.2em; }
+{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 860px;">
+
+  <!-- Header -->
+  <div class="mb-4">
+    <div class="d-flex justify-content-between align-items-start">
+      <div>
+        <h5 class="fw-bold mb-1">
+          {% if report.is_complete %}<span class="badge bg-success me-1" style="font-size:0.7rem;">Complete</span>{% endif %}
+          {{ report.site.site_no }} — {{ report.site.name }}
+        </h5>
+        <div class="text-muted small" id="date-display">
+          {{ report.get_report_type_display }} &middot;
+          {{ report.period_start }} to {{ report.period_end }}
+          <button class="btn btn-link btn-sm p-0 ms-1" style="font-size:0.75rem;" id="edit-dates-btn">Edit dates</button>
+        </div>
+        <!-- Date edit form (hidden by default) -->
+        <form method="post" action="{% url 'analysis_update_dates' report.pk %}" id="date-edit-form" class="d-none mt-1">
+          {% csrf_token %}
+          <div class="d-flex align-items-center gap-2">
+            <input type="date" name="period_start" class="form-control form-control-sm" style="width:150px;"
+                   value="{{ report.period_start }}">
+            <span class="text-muted small">to</span>
+            <input type="date" name="period_end" class="form-control form-control-sm" style="width:150px;"
+                   value="{{ report.period_end }}">
+            <button type="submit" class="btn btn-primary btn-sm">Save</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="cancel-dates-btn">Cancel</button>
+          </div>
+        </form>
+      </div>
+      <div class="d-flex gap-2">
+        <form method="post" action="{% url 'analysis_toggle_complete' report.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm {% if report.is_complete %}btn-outline-secondary{% else %}btn-success{% endif %}">
+            {% if report.is_complete %}Reopen{% else %}Mark Complete{% endif %}
+          </button>
+        </form>
+        <form method="post" action="{% url 'analysis_delete_report' report.pk %}"
+              onsubmit="return confirm('Delete this report? This cannot be undone.');">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+        </form>
+        <a href="{% url 'analysis_index' %}" class="btn btn-outline-secondary btn-sm">← All Reports</a>
+      </div>
+    </div>
+    <div class="mt-3 d-flex align-items-center gap-2">
+      <div class="progress flex-grow-1" style="height: 8px;">
+        <div class="progress-bar bg-success" id="completion-bar" style="width: {{ completion_pct }}%;"></div>
+      </div>
+      <span class="text-muted small" id="completion-label">{{ completion_pct }}% complete</span>
+      {% if can_ai_assist %}
+      <button class="btn btn-sm btn-primary" id="ai-assist-all-btn"
+              data-url="{% url 'analysis_ai_assist_all' report.pk %}">
+        AI Assist
+      </button>
+      {% endif %}
+      <a class="btn btn-sm btn-outline-secondary"
+         href="{% url 'analysis_export_prompt' report.pk %}"
+         title="Download the AI prompt as a text file to paste into Claude.ai">
+        Export Prompt (Claude)
+      </a>
+      <a class="btn btn-sm btn-outline-secondary"
+         href="{% url 'analysis_export_prompt_copilot' report.pk %}"
+         title="Download a Copilot-optimised prompt as a text file">
+        Export Prompt (Copilot)
+      </a>
+    </div>
+    <div id="ai-assist-status" class="text-muted small mt-1" style="display:none;"></div>
+  </div>
+
+  <!-- Site Data Panel (stage/discharge) -->
+  {% if report.report_type == 'stage_discharge' and site_data %}
+  <div class="card shadow-sm mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center py-2">
+      <div>
+        <h6 class="mb-0 fw-bold">Stage &amp; Discharge Data</h6>
+        <div class="text-muted small">
+          {{ site_data.data_start }} to {{ site_data.data_end }}
+          {% if site_data.extended %}
+          <span class="badge bg-info text-dark ms-1" style="font-size:0.7rem;">Extended to WY start</span>
+          {% endif %}
+        </div>
+      </div>
+      <button class="btn btn-sm btn-outline-secondary" type="button"
+              data-bs-toggle="collapse" data-bs-target="#stage-q-data-panel">Toggle</button>
+    </div>
+    <div class="collapse show" id="stage-q-data-panel">
+      <div class="card-body">
+        {% if site_data.error %}
+        <div class="alert alert-warning py-2 mb-0">{{ site_data.error }}</div>
+        {% else %}
+
+        <!-- Comparison site management -->
+        <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+          {% for cs in comparison_sites %}
+          <span class="badge bg-secondary d-flex align-items-center gap-1" style="font-size:0.8rem;">
+            {{ cs.site.site_no }}
+            <button class="btn-close btn-close-white stageq-comp-remove-btn"
+                    style="font-size:0.6rem;"
+                    data-url="{% url 'analysis_delete_stage_q_comparison' report.pk cs.pk %}"></button>
+          </span>
+          {% endfor %}
+          <div class="d-flex gap-1">
+            <input type="text" id="stageq-comp-site-input" class="form-control form-control-sm"
+                   placeholder="Add comparison site…" style="width:180px;">
+            <button class="btn btn-sm btn-outline-primary" id="stageq-comp-add-btn">Add</button>
+          </div>
+          <span class="text-danger small" id="stageq-comp-error" style="display:none;"></span>
+        </div>
+
+        {{ site_data.chart_html|safe }}
+
+        <!-- Analysis period stats -->
+        <div class="fw-semibold small text-muted mb-1 mt-2">Analysis Period: {{ site_data.period_start }} – {{ site_data.period_end }}</div>
+        <div class="row g-3">
+          <!-- Discharge -->
+          {% with s=site_data.discharge %}
+          <div class="col-md-6">
+            <div class="fw-semibold small mb-1">Discharge ({{ s.unit }}) — {{ report.site.site_no }}</div>
+            {% if s.error %}
+            <div class="text-muted small">{{ s.error }}</div>
+            {% else %}
+            <table class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">
+              <tr><td class="text-muted">Peak</td><td>{{ s.peak_value }} {{ s.unit }}</td><td class="text-muted">{{ s.peak_datetime }}</td></tr>
+              <tr><td class="text-muted">Min instantaneous</td><td>{{ s.min_value }} {{ s.unit }}</td><td class="text-muted">{{ s.min_datetime }}</td></tr>
+              <tr><td class="text-muted">Min daily mean</td><td>{{ s.min_daily_value }} {{ s.unit }}</td><td class="text-muted">{{ s.min_daily_date }}</td></tr>
+            </table>
+            {% endif %}
+          </div>
+          {% endwith %}
+          <!-- Stage -->
+          {% with s=site_data.stage %}
+          <div class="col-md-6">
+            <div class="fw-semibold small mb-1">Gage Height ({{ s.unit }}) — {{ report.site.site_no }}</div>
+            {% if s.error %}
+            <div class="text-muted small">{{ s.error }}</div>
+            {% else %}
+            <table class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">
+              <tr><td class="text-muted">Peak</td><td>{{ s.peak_value }} {{ s.unit }}</td><td class="text-muted">{{ s.peak_datetime }}</td></tr>
+              <tr><td class="text-muted">Min instantaneous</td><td>{{ s.min_value }} {{ s.unit }}</td><td class="text-muted">{{ s.min_datetime }}</td></tr>
+              <tr><td class="text-muted">Min daily mean</td><td>{{ s.min_daily_value }} {{ s.unit }}</td><td class="text-muted">{{ s.min_daily_date }}</td></tr>
+            </table>
+            {% endif %}
+          </div>
+          {% endwith %}
+        </div>
+
+        <!-- Per-water-year stats table -->
+        {% if site_data.wy_stats %}
+        <div class="mt-3">
+          <div class="fw-semibold small text-muted mb-1">Water Year Statistics</div>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">
+              <thead class="table-light">
+                <tr>
+                  <th>Water Year</th>
+                  <th>Peak Q (cfs)</th>
+                  <th>Peak Q Date</th>
+                  <th>Peak GH (ft)</th>
+                  <th>Peak GH Date</th>
+                  <th>Min Daily Q (cfs)</th>
+                  <th>Min Daily Q Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for wy in site_data.wy_stats %}
+                <tr>
+                  <td class="fw-semibold">{{ wy.wy_label }}</td>
+                  {% if wy.discharge.error %}
+                  <td colspan="2" class="text-muted">{{ wy.discharge.error }}</td>
+                  {% else %}
+                  <td>{{ wy.discharge.peak_value }}</td>
+                  <td class="text-muted">{{ wy.discharge.peak_datetime }}</td>
+                  {% endif %}
+                  {% if wy.stage.error %}
+                  <td colspan="2" class="text-muted">{{ wy.stage.error }}</td>
+                  {% else %}
+                  <td>{{ wy.stage.peak_value }}</td>
+                  <td class="text-muted">{{ wy.stage.peak_datetime }}</td>
+                  {% endif %}
+                  {% if wy.discharge.error %}
+                  <td colspan="2" class="text-muted">—</td>
+                  {% else %}
+                  <td>{{ wy.discharge.min_daily_value }}</td>
+                  <td class="text-muted">{{ wy.discharge.min_daily_date }}</td>
+                  {% endif %}
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Field measurements table -->
+        {% if site_data.measurements %}
+        <div class="mt-3">
+          <div class="d-flex align-items-baseline gap-2 mb-1">
+            <div class="fw-semibold small text-muted">Field Measurements — Analysis Period</div>
+            {% with s=site_data.measurements_summary %}
+            <div class="text-muted" style="font-size:0.78rem;">
+              {{ s.count }} measurement{{ s.count|pluralize }} &middot;
+              {{ s.min_q }}–{{ s.max_q }} cfs
+            </div>
+            {% endwith %}
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">
+              <thead class="table-light">
+                <tr>
+                  <th>#</th>
+                  <th>Date</th>
+                  <th>Stage (ft)</th>
+                  <th>Discharge (cfs)</th>
+                  <th>Quality</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for m in site_data.measurements %}
+                <tr>
+                  <td class="text-muted">{{ m.number }}</td>
+                  <td>{{ m.date }}</td>
+                  <td>{{ m.stage }}</td>
+                  <td>{{ m.discharge }}</td>
+                  <td style="color: {{ m.quality_color }}; font-weight:600;">{{ m.quality }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Comparison discharge stats table -->
+        {% if site_data.comparisons %}
+        <div class="table-responsive mt-3">
+          <table class="table table-sm table-bordered mb-0" style="font-size:0.85rem;">
+            <thead class="table-light">
+              <tr>
+                <th>Metric</th>
+                <th>{{ report.site.site_no }} (primary)</th>
+                {% for comp in site_data.comparisons %}
+                <th>{{ comp.site_no }}{% if comp.error %} <span class="text-danger">— error</span>{% endif %}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Peak discharge (cfs)</td>
+                <td>{{ site_data.discharge.peak_value }} <span class="text-muted">{{ site_data.discharge.peak_datetime }}</span></td>
+                {% for comp in site_data.comparisons %}
+                <td>{% if comp.error %}—{% else %}{{ comp.peak_value }} <span class="text-muted">{{ comp.peak_datetime }}</span>{% endif %}</td>
+                {% endfor %}
+              </tr>
+              <tr>
+                <td>Min instantaneous (cfs)</td>
+                <td>{{ site_data.discharge.min_value }} <span class="text-muted">{{ site_data.discharge.min_datetime }}</span></td>
+                {% for comp in site_data.comparisons %}
+                <td>{% if comp.error %}—{% else %}{{ comp.min_value }} <span class="text-muted">{{ comp.min_datetime }}</span>{% endif %}</td>
+                {% endfor %}
+              </tr>
+              <tr>
+                <td>Min daily mean (cfs)</td>
+                <td>{{ site_data.discharge.min_daily_value }} <span class="text-muted">{{ site_data.discharge.min_daily_date }}</span></td>
+                {% for comp in site_data.comparisons %}
+                <td>{% if comp.error %}—{% else %}{{ comp.min_daily_value }} <span class="text-muted">{{ comp.min_daily_date }}</span>{% endif %}</td>
+                {% endfor %}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Site Data Panel (precipitation) -->
+  {% if report.report_type == 'precipitation' and site_data %}
+  <div class="card shadow-sm mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center py-2">
+      <h6 class="mb-0 fw-bold">Precipitation Data — {{ report.period_start }} to {{ report.period_end }}</h6>
+      <button class="btn btn-sm btn-outline-secondary" type="button"
+              data-bs-toggle="collapse" data-bs-target="#precip-data-panel">
+        Toggle
+      </button>
+    </div>
+    <div class="collapse show" id="precip-data-panel">
+      <div class="card-body">
+        {% if site_data.error %}
+        <div class="alert alert-warning py-2 mb-0">{{ site_data.error }}</div>
+        {% else %}
+
+        <!-- Comparison site management -->
+        <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+          {% for cs in comparison_sites %}
+          <span class="badge bg-secondary d-flex align-items-center gap-1" style="font-size:0.8rem;">
+            {{ cs.site.site_no }}
+            <button class="btn-close btn-close-white comp-remove-btn"
+                    style="font-size:0.6rem;"
+                    data-id="{{ cs.pk }}"
+                    data-url="{% url 'analysis_delete_comparison_site' report.pk cs.pk %}"></button>
+          </span>
+          {% endfor %}
+          <div class="d-flex gap-1" id="comp-add-row">
+            <input type="text" id="comp-site-input" class="form-control form-control-sm"
+                   placeholder="Add comparison site…" style="width:180px;">
+            <button class="btn btn-sm btn-outline-primary" id="comp-add-btn">Add</button>
+          </div>
+          <span class="text-danger small" id="comp-error" style="display:none;"></span>
+        </div>
+
+        <!-- Chart -->
+        {{ site_data.chart_html|safe }}
+
+        <!-- Stats comparison table -->
+        <div class="table-responsive mt-3">
+          <table class="table table-sm table-bordered mb-0" style="font-size:0.85rem;">
+            <thead class="table-light">
+              <tr>
+                <th>Metric</th>
+                <th>{{ report.site.site_no }} (primary)</th>
+                {% for comp in site_data.comparisons %}
+                <th>
+                  {{ comp.site_no }}
+                  {% if comp.error %}<span class="text-danger"> — error</span>{% endif %}
+                </th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Total ({{ site_data.unit }})</td>
+                <td>{{ site_data.primary.total_precip }}</td>
+                {% for comp in site_data.comparisons %}
+                <td>{% if comp.error %}—{% else %}{{ comp.total_precip }}{% endif %}</td>
+                {% endfor %}
+              </tr>
+              <tr>
+                <td>Days with precip</td>
+                <td>{{ site_data.primary.days_with_precip }}</td>
+                {% for comp in site_data.comparisons %}
+                <td>{% if comp.error %}—{% else %}{{ comp.days_with_precip }}{% endif %}</td>
+                {% endfor %}
+              </tr>
+              <tr>
+                <td>Largest day ({{ site_data.unit }})</td>
+                <td>{{ site_data.primary.max_day_total }} on {{ site_data.primary.max_day }}</td>
+                {% for comp in site_data.comparisons %}
+                <td>{% if comp.error %}—{% else %}{{ comp.max_day_total }} on {{ comp.max_day }}{% endif %}</td>
+                {% endfor %}
+              </tr>
+              <tr>
+                <td>Gaps &gt; 2 hrs</td>
+                <td>
+                  {% if site_data.primary.gaps %}
+                    <span class="text-danger">{{ site_data.primary.gaps|length }}</span>
+                  {% else %}None{% endif %}
+                </td>
+                {% for comp in site_data.comparisons %}
+                <td>
+                  {% if comp.error %}—
+                  {% elif comp.gaps %}<span class="text-danger">{{ comp.gaps|length }}</span>
+                  {% else %}None{% endif %}
+                </td>
+                {% endfor %}
+              </tr>
+              <tr>
+                <td>Estimated periods</td>
+                <td>
+                  {% if site_data.primary.estimated_periods %}
+                    <span class="text-warning-emphasis">{{ site_data.primary.estimated_periods|length }}</span>
+                  {% else %}None{% endif %}
+                </td>
+                {% for comp in site_data.comparisons %}
+                <td>
+                  {% if comp.error %}—
+                  {% elif comp.estimated_periods %}<span class="text-warning-emphasis">{{ comp.estimated_periods|length }}</span>
+                  {% else %}None{% endif %}
+                </td>
+                {% endfor %}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Combined daily totals table -->
+        {% if site_data.primary.table_rows %}
+        <details class="mt-3">
+          <summary class="text-muted small" style="cursor:pointer;">Daily totals (days with precip only)</summary>
+          <div class="table-responsive mt-2">
+            <table class="table table-sm table-bordered mb-0" style="font-size:0.85rem;">
+              <thead class="table-light">
+                <tr>
+                  <th>Date</th>
+                  <th>{{ report.site.site_no }} ({{ site_data.unit }})</th>
+                  {% for comp in site_data.comparisons %}
+                  {% if not comp.error %}<th>{{ comp.site_no }} ({{ site_data.unit }})</th>{% endif %}
+                  {% endfor %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in site_data.daily_table_rows %}
+                <tr>
+                  <td>{{ row.date }}</td>
+                  <td>{{ row.primary }}</td>
+                  {% for val in row.comparisons %}<td>{{ val }}</td>{% endfor %}
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </details>
+        {% endif %}
+
+        <!-- Gap details per site -->
+        {% if site_data.primary.gaps %}
+        <details class="mt-3">
+          <summary class="text-danger small fw-semibold" style="cursor:pointer;">
+            {{ report.site.site_no }} — {{ site_data.primary.gaps|length }} gap{{ site_data.primary.gaps|length|pluralize }}
+          </summary>
+          <table class="table table-sm table-bordered mt-1" style="max-width:400px; font-size:0.82rem;">
+            <thead><tr><th>Gap Start (UTC)</th><th>Duration (hrs)</th></tr></thead>
+            <tbody>
+              {% for gap in site_data.primary.gaps %}
+              <tr><td>{{ gap.start }}</td><td>{{ gap.duration_hours }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </details>
+        {% endif %}
+        {% for comp in site_data.comparisons %}
+        {% if comp.gaps %}
+        <details class="mt-2">
+          <summary class="text-danger small fw-semibold" style="cursor:pointer;">
+            {{ comp.site_no }} — {{ comp.gaps|length }} gap{{ comp.gaps|length|pluralize }}
+          </summary>
+          <table class="table table-sm table-bordered mt-1" style="max-width:400px; font-size:0.82rem;">
+            <thead><tr><th>Gap Start (UTC)</th><th>Duration (hrs)</th></tr></thead>
+            <tbody>
+              {% for gap in comp.gaps %}
+              <tr><td>{{ gap.start }}</td><td>{{ gap.duration_hours }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </details>
+        {% endif %}
+        {% endfor %}
+
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Calibration Card (precipitation only) -->
+  {% if report.report_type == 'precipitation' and site_data %}
+  <div class="card shadow-sm mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center py-2">
+      <h6 class="mb-0 fw-bold">Calibrations</h6>
+      <button class="btn btn-sm btn-primary" id="show-cal-form-btn">+ Add Calibration</button>
+    </div>
+    <div class="card-body">
+
+      <!-- Inline add form (hidden by default) -->
+      <div id="cal-form" class="border rounded p-3 mb-3 bg-light" style="display:none;">
+        <div class="row g-2 align-items-end">
+          <div class="col-sm-3">
+            <label class="form-label small fw-semibold mb-1">Date</label>
+            <input type="date" id="cal-date" class="form-control form-control-sm">
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label small fw-semibold mb-1">Desired Tips</label>
+            <input type="number" id="cal-desired" class="form-control form-control-sm" min="0" step="any">
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label small fw-semibold mb-1">Actual Tips</label>
+            <input type="number" id="cal-actual" class="form-control form-control-sm" min="0" step="any">
+          </div>
+          <div class="col-sm-3 d-flex gap-2">
+            <button class="btn btn-primary btn-sm w-100" id="cal-save-btn">Save</button>
+            <button class="btn btn-outline-secondary btn-sm w-100" id="cal-cancel-btn">Cancel</button>
+          </div>
+        </div>
+        <div class="text-danger small mt-2" id="cal-error" style="display:none;"></div>
+      </div>
+
+      <!-- Calibration table -->
+      <table class="table table-sm table-bordered mb-0" id="cal-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Desired Tips</th>
+            <th>Actual Tips</th>
+            <th>Error</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="cal-tbody">
+          {% for cal in calibrations %}
+          <tr id="cal-row-{{ cal.id }}">
+            <td>{{ cal.date }}</td>
+            <td>{{ cal.desired_tips }}</td>
+            <td>{{ cal.actual_tips }}</td>
+            <td>{{ cal.error_pct }}</td>
+            <td class="text-center">
+              <button class="btn btn-link btn-sm text-danger p-0 cal-delete-btn"
+                      data-id="{{ cal.id }}"
+                      data-url="{% url 'analysis_delete_calibration' report.pk cal.id %}">✕</button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr id="cal-empty-row"><td colspan="5" class="text-muted text-center">No calibrations recorded.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Sections -->
+  {% for section in sections %}
+  <div class="card shadow-sm mb-4" id="section-{{ section.key }}">
+    <div class="card-header py-2">
+      <h6 class="mb-0 fw-bold">{{ section.title }}</h6>
+    </div>
+    <div class="card-body">
+      <p class="text-muted small mb-2">{{ section.guidance }}</p>
+      {% if section.key == 'extremes' and report.report_type == 'stage_discharge' and site_data and site_data.extremes_by_wy %}
+      {% for wy in site_data.extremes_by_wy %}
+      <div class="fw-semibold small mb-1">Extremes for {{ wy.wy_label }}</div>
+      <div class="p-3 bg-light border rounded mb-2" style="font-size:0.9rem;">{{ wy.sentence }}</div>
+      {% endfor %}
+      <div class="text-muted small mt-1">Auto-generated from fetched data.</div>
+      {% else %}
+      <textarea class="form-control section-textarea"
+                id="textarea-{{ section.key }}"
+                data-section-key="{{ section.key }}"
+                data-autosave-url="{% url 'analysis_autosave' report.pk %}"
+                rows="8">{{ section.text }}</textarea>
+      <div class="text-muted small mt-1 autosave-status" id="status-{{ section.key }}"></div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+  const CSRF_TOKEN = '{{ csrf_token }}';
+  const timers = {};
+
+  // --- Autosave ---
+  document.querySelectorAll('.section-textarea').forEach(ta => {
+    ta.addEventListener('input', () => {
+      const key = ta.dataset.sectionKey;
+      const url = ta.dataset.autosaveUrl;
+      const statusEl = document.getElementById(`status-${key}`);
+      clearTimeout(timers[key]);
+      statusEl.textContent = 'Saving…';
+      timers[key] = setTimeout(async () => {
+        try {
+          const resp = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': CSRF_TOKEN,
+            },
+            body: JSON.stringify({ section_key: key, text: ta.value }),
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            statusEl.textContent = 'Saved';
+            document.getElementById('completion-bar').style.width = data.completion_pct + '%';
+            document.getElementById('completion-label').textContent = data.completion_pct + '% complete';
+          } else {
+            statusEl.textContent = 'Error saving';
+          }
+        } catch {
+          statusEl.textContent = 'Error saving';
+        }
+      }, 600);
+    });
+  });
+
+  // --- Comparison sites ---
+  const compAddBtn = document.getElementById('comp-add-btn');
+  const compInput = document.getElementById('comp-site-input');
+  const compError = document.getElementById('comp-error');
+
+  if (compAddBtn) {
+    compAddBtn.addEventListener('click', async () => {
+      const siteNo = compInput.value.trim();
+      if (!siteNo) return;
+      compAddBtn.disabled = true;
+      compError.style.display = 'none';
+
+      try {
+        const resp = await fetch("{% url 'analysis_add_comparison_site' report.pk %}", {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+          body: JSON.stringify({ site_no: siteNo }),
+        });
+        const data = await resp.json();
+        if (!data.ok) throw new Error(data.error || 'Failed to add site');
+
+        // Full reload so chart and stats table refresh with new site data
+        window.location.reload();
+      } catch (err) {
+        compError.textContent = err.message;
+        compError.style.display = 'inline';
+        compAddBtn.disabled = false;
+      }
+    });
+
+    compInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') compAddBtn.click();
+    });
+
+    document.querySelectorAll('.comp-remove-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const resp = await fetch(btn.dataset.url, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': CSRF_TOKEN },
+        });
+        if (resp.ok) window.location.reload();
+      });
+    });
+  }
+
+  // --- Stage/discharge comparison sites ---
+  const stageqCompAddBtn = document.getElementById('stageq-comp-add-btn');
+  const stageqCompInput = document.getElementById('stageq-comp-site-input');
+  const stageqCompError = document.getElementById('stageq-comp-error');
+
+  if (stageqCompAddBtn) {
+    stageqCompAddBtn.addEventListener('click', async () => {
+      const siteNo = stageqCompInput.value.trim();
+      if (!siteNo) return;
+      stageqCompAddBtn.disabled = true;
+      stageqCompError.style.display = 'none';
+
+      try {
+        const resp = await fetch("{% url 'analysis_add_stage_q_comparison' report.pk %}", {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+          body: JSON.stringify({ site_no: siteNo }),
+        });
+        const data = await resp.json();
+        if (!data.ok) throw new Error(data.error || 'Failed to add site');
+        window.location.reload();
+      } catch (err) {
+        stageqCompError.textContent = err.message;
+        stageqCompError.style.display = 'inline';
+        stageqCompAddBtn.disabled = false;
+      }
+    });
+
+    stageqCompInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') stageqCompAddBtn.click();
+    });
+
+    document.querySelectorAll('.stageq-comp-remove-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const resp = await fetch(btn.dataset.url, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': CSRF_TOKEN },
+        });
+        if (resp.ok) window.location.reload();
+      });
+    });
+  }
+
+  // --- Calibrations ---
+  const showCalBtn = document.getElementById('show-cal-form-btn');
+  const calForm = document.getElementById('cal-form');
+  const calCancelBtn = document.getElementById('cal-cancel-btn');
+  const calSaveBtn = document.getElementById('cal-save-btn');
+  const calError = document.getElementById('cal-error');
+
+  if (showCalBtn) {
+    showCalBtn.addEventListener('click', () => {
+      calForm.style.display = 'block';
+      showCalBtn.style.display = 'none';
+    });
+
+    calCancelBtn.addEventListener('click', () => {
+      calForm.style.display = 'none';
+      showCalBtn.style.display = '';
+      calError.style.display = 'none';
+    });
+
+    calSaveBtn.addEventListener('click', async () => {
+      const date = document.getElementById('cal-date').value;
+      const desired = document.getElementById('cal-desired').value;
+      const actual = document.getElementById('cal-actual').value;
+
+      if (!date || !desired || actual === '') {
+        calError.textContent = 'All fields are required.';
+        calError.style.display = 'block';
+        return;
+      }
+
+      calSaveBtn.disabled = true;
+      calError.style.display = 'none';
+
+      try {
+        const resp = await fetch("{% url 'analysis_add_calibration' report.pk %}", {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+          body: JSON.stringify({ date, desired_tips: desired, actual_tips: actual }),
+        });
+        const data = await resp.json();
+        if (!data.ok) throw new Error(data.error || 'Save failed');
+
+        // Remove empty-state row if present
+        const emptyRow = document.getElementById('cal-empty-row');
+        if (emptyRow) emptyRow.remove();
+
+        // Append new row
+        const tbody = document.getElementById('cal-tbody');
+        const deleteUrl = "{% url 'analysis_delete_calibration' report.pk 0 %}".replace('/0/', `/${data.id}/`);
+        const tr = document.createElement('tr');
+        tr.id = `cal-row-${data.id}`;
+        tr.innerHTML = `
+          <td>${data.date}</td>
+          <td>${data.desired_tips}</td>
+          <td>${data.actual_tips}</td>
+          <td>${data.error_pct}</td>
+          <td class="text-center">
+            <button class="btn btn-link btn-sm text-danger p-0 cal-delete-btn"
+                    data-id="${data.id}" data-url="${deleteUrl}">✕</button>
+          </td>`;
+        tbody.appendChild(tr);
+        attachDeleteHandler(tr.querySelector('.cal-delete-btn'));
+
+        // Reset form
+        document.getElementById('cal-date').value = '';
+        document.getElementById('cal-desired').value = '';
+        document.getElementById('cal-actual').value = '';
+        calForm.style.display = 'none';
+        showCalBtn.style.display = '';
+      } catch (err) {
+        calError.textContent = err.message;
+        calError.style.display = 'block';
+      } finally {
+        calSaveBtn.disabled = false;
+      }
+    });
+
+    function attachDeleteHandler(btn) {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Delete this calibration?')) return;
+        const resp = await fetch(btn.dataset.url, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': CSRF_TOKEN },
+        });
+        if (resp.ok) {
+          const row = document.getElementById(`cal-row-${btn.dataset.id}`);
+          row.remove();
+          if (document.getElementById('cal-tbody').children.length === 0) {
+            const tbody = document.getElementById('cal-tbody');
+            tbody.innerHTML = '<tr id="cal-empty-row"><td colspan="5" class="text-muted text-center">No calibrations recorded.</td></tr>';
+          }
+        }
+      });
+    }
+
+    document.querySelectorAll('.cal-delete-btn').forEach(attachDeleteHandler);
+  }
+
+  // --- Edit dates toggle ---
+  document.getElementById('edit-dates-btn')?.addEventListener('click', () => {
+    document.getElementById('date-edit-form').classList.remove('d-none');
+    document.getElementById('edit-dates-btn').style.display = 'none';
+  });
+  document.getElementById('cancel-dates-btn')?.addEventListener('click', () => {
+    document.getElementById('date-edit-form').classList.add('d-none');
+    document.getElementById('edit-dates-btn').style.display = '';
+  });
+
+  // --- AI Assist All Sections ---
+  const aiAllBtn = document.getElementById('ai-assist-all-btn');
+  const aiStatus = document.getElementById('ai-assist-status');
+
+  async function autosaveSection(key, text) {
+    const ta = document.getElementById(`textarea-${key}`);
+    if (!ta) return;
+    const url = ta.dataset.autosaveUrl;
+    const statusEl = document.getElementById(`status-${key}`);
+    statusEl.textContent = 'Saving…';
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({ section_key: key, text }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        statusEl.textContent = 'Saved';
+        document.getElementById('completion-bar').style.width = data.completion_pct + '%';
+        document.getElementById('completion-label').textContent = data.completion_pct + '% complete';
+      } else {
+        statusEl.textContent = 'Save error';
+      }
+    } catch {
+      statusEl.textContent = 'Save error';
+    }
+  }
+
+  if (aiAllBtn) {
+    aiAllBtn.addEventListener('click', async () => {
+      aiAllBtn.disabled = true;
+      aiAllBtn.textContent = 'Generating…';
+      aiStatus.style.display = 'block';
+      aiStatus.textContent = 'Starting AI generation…';
+
+      let currentKey = null;
+      let currentText = '';
+
+      try {
+        const resp = await fetch(aiAllBtn.dataset.url, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': CSRF_TOKEN },
+        });
+
+        if (!resp.ok) {
+          aiStatus.textContent = 'Error: ' + resp.statusText;
+          return;
+        }
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const payload = line.slice(6);
+
+            if (payload === '[DONE]') {
+              // Save final section
+              if (currentKey) await autosaveSection(currentKey, currentText);
+              aiStatus.textContent = 'All sections generated and saved.';
+              break;
+            }
+
+            if (payload.startsWith('\u00a7SECTION:')) {
+              // Save previous section before switching
+              if (currentKey) await autosaveSection(currentKey, currentText);
+              currentKey = payload.slice(9);
+              currentText = '';
+              const ta = document.getElementById(`textarea-${currentKey}`);
+              if (ta) {
+                ta.value = '';
+                // Scroll section into view
+                document.getElementById(`section-${currentKey}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              }
+              aiStatus.textContent = `Writing: ${currentKey.replace(/_/g, ' ')}…`;
+            } else if (currentKey) {
+              const chunk = payload.replace(/\\n/g, '\n');
+              currentText += chunk;
+              const ta = document.getElementById(`textarea-${currentKey}`);
+              if (ta) ta.value = currentText;
+            }
+          }
+        }
+      } catch (err) {
+        aiStatus.textContent = 'Error: ' + err.message;
+      } finally {
+        aiAllBtn.disabled = false;
+        aiAllBtn.textContent = 'AI Assist';
+      }
+    });
+  }
+</script>
+{% endblock %}

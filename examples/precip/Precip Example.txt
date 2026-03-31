@@ -1,0 +1,17 @@
+Precipitation Record: A calibration was checked at the beginning and end of analysis period. The analysis period experienced three different rain events with a range of 0.04 in to 0.80 in, which recorded 1.00 in of rain in total during this period. The largest rain event during the period was from 05/04/2025 to 05/07/2025 with 0.80 in of rain.
+
+Backup Data: Backup data was downloaded and stored in edata. There were no gaps present to be filled with EDL. 
+
+Missing Data or Affected by Ice/Snow or Funnel Clog: No missing data. No data affected by ice.
+
+Edits: All test tips made during site visits were deleted.
+
+Corrections: No corrections were made. 
+
+Estimates: No estimates were made. 
+
+Hyetographic Comparison: The site compares well with nearby sites 09419740 (USGS), 4549 (Clark County) and 4544 (Clark County). 
+
+Calibrations: Calibrations were performed on 4/14/25 and 7/22/25. On 4/14/25, the calibration passed with -2.0 % error and on 07/22/2025, the calibration passed with 0.3% error.
+
+Comments: Take a picture of rain gage status, level, and amount of water left in rain gage tip by calibration kit are encouraged.

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% load socialaccount %}
+
+{% block title %}Log In — HydroHelper{% endblock %}
+
+{% block extra_style %}
+  .social-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.45rem 0.9rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid #dee2e6;
+    background: white;
+    color: #333;
+    margin-bottom: 0.5rem;
+    transition: background 0.15s;
+  }
+  .social-btn:hover { background: #f8f9fa; color: #333; }
+  .social-btn img { width: 18px; height: 18px; }
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-center align-items-center" style="min-height: calc(100vh - 56px);">
+  <div class="card shadow-sm" style="width: 360px;">
+    <div class="card-body p-4">
+      <h5 class="card-title fw-bold mb-1">Log In</h5>
+      <p class="text-muted small mb-4">Sign in to your HydroHelper account.</p>
+
+      <!-- Social login -->
+      <a href="{% provider_login_url 'google' %}" class="social-btn">
+        <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google">
+        Continue with Google
+      </a>
+
+      <div class="d-flex align-items-center my-3">
+        <hr class="flex-grow-1 m-0">
+        <span class="px-2 text-muted small">or</span>
+        <hr class="flex-grow-1 m-0">
+      </div>
+
+      <!-- Username / password login -->
+      <form method="post" action="{% url 'login' %}">
+        {% csrf_token %}
+        {% if form.errors %}
+          <div class="alert alert-danger py-2 small">Invalid username or password.</div>
+        {% endif %}
+        <div class="mb-3">
+          <label for="id_username" class="form-label fw-semibold">Username</label>
+          <input type="text" name="username" id="id_username" class="form-control" autofocus required>
+        </div>
+        <div class="mb-4">
+          <label for="id_password" class="form-label fw-semibold">Password</label>
+          <input type="password" name="password" id="id_password" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Log In</button>
+      </form>
+
+      <hr class="my-3">
+      <p class="text-center small mb-0">
+        Don't have an account? <a href="{% url 'register' %}">Register</a>
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

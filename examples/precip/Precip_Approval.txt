@@ -1,0 +1,55 @@
+1. Field Notes, Calibration Notes, Station Description:
+
+1.1. Were field notes, and calibration notes adequately reviewed and were these reviews documented in accordance with WSC procedures? (if not, this task must be completed before approval)
+
+1.2. Have measurements, field notes, level notes, and other information been properly stored / archived in accordance with WSC procedures?
+
+1.3. Has the Station Description been properly updated to reflect any changes made or observed during analysis period?
+
+2. Calibrations:
+
+2.1. Date of last calibration:
+
+2.2. Is a calibration overdue? Although calibrations are not required for analysis, precipitation records cannot be approved without "bookending" successful calibrations. Annual calibrations are required; if water year is complete and a calibration has not been performed, a calibration should be scheduled immediately. If more frequent approval is desired, then WSC policy regarding calibration frequency should be revised accordingly.
+
+2.3. Was the instrument replaced or calibrated during the analysis period? (if no, go on to section 3)
+
+2.3.1. Was the calibration done in compliance with OSW TM 2006.01 and documented following procedures outlined in the WSC’s Quality Assurance Plan (if not, period cannot be approved until a valid calibration is performed/documented)?
+
+2.4. Did the calibration error exceed 5% (if no, go on to section 3)
+
+2.4.1. If the calibration error exceeded 10%, all data since collected since the last successful calibration should have been totally removed from the database.
+
+2.4.2. Remediation actions should be fully documented (instrument replaced, leveled or other reparations made, followed by a successful calibration).
+
+3. Edits:
+
+3.1. Were periods of erroneous recorded precipitation amounts (due to clogs, snow/ice, and damage to gage) removed?
+
+3.1.1. Was this adequately discussed in the station analysis?
+
+3.2. Was backup data available, downloaded, and used to fill any gaps in transmissions?
+
+3.2.1. Was this adequately discussed in the station analysis?
+
+4. Corrections: Corrections should generally not be applied without compelling justifications as to the amount and timing. When applied, ensure the rationale and implementation are adequate.
+
+5. Estimates: Are estimates appropriate, consistent, and developed using recommended methods and with due consideration of all available information?
+
+6. Hyetographic Comparison: Have hyetographic comparisons been adequately made and discussed?
+
+7. Daily Values
+
+7.1. Examine computed daily values for accuracy, completeness and proper use of qualifiers.
+
+8. Manuscript
+
+8.1. Have SIMS Manuscript elements been updated as needed?
+
+9. Approval Evaluation: Provide brief assessment of the analysis period in context of the findings outlined above. Discuss analyst's evaluation of record and provide your evaluation
+
+10. Operational Follow Up: List suggested follow-up such as corrective actions or other needed information, measurements, or observations.
+
+Versioning information:
+October 2017: In sections 2.4 and 2.4.2 "5%" replaced with "10%"
+June 2020: In section 2.4 "10%" replaced with "5%"; In section 2.4.1 added "If the calibration error exceeded 10%,"; In section 2.4.2 removed "Regardless, data in the previous calibration period should be removed from the database if the calibration error exceeded 10%."
