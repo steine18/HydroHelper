@@ -14,7 +14,7 @@ class FlowBalanceConfig(models.Model):
         related_name='flow_balance_configs',
     )
     primary_site    = models.ForeignKey(
-        'sites.Site',
+        'usgs_sites.Site',
         on_delete=models.CASCADE,
         related_name='flow_balance_configs',
     )

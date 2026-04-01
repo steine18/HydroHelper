@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('sites', '0003_move_schedule_to_site'),
+        ('usgs_sites', '0003_move_schedule_to_site'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
@@ -26,7 +26,7 @@ class Migration(migrations.Migration):
                 ('saved_to_reports', models.BooleanField(default=False)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
-                ('site', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='analysis_reports', to='sites.site')),
+                ('site', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='analysis_reports', to='usgs_sites.site')),
                 ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='analysis_reports', to=settings.AUTH_USER_MODEL)),
             ],
             options={

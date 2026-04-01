@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('sites', '0001_initial'),
+        ('usgs_sites', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
@@ -27,7 +27,7 @@ class Migration(migrations.Migration):
                 ('comparison_sites', models.JSONField(default=list)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
-                ('primary_site', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='flow_balance_configs', to='sites.site')),
+                ('primary_site', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='flow_balance_configs', to='usgs_sites.site')),
                 ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='flow_balance_configs', to=settings.AUTH_USER_MODEL)),
             ],
             options={

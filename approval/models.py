@@ -15,7 +15,7 @@ class ApprovalRequest(models.Model):
         related_name='approval_requests',
     )
     site = models.ForeignKey(
-        'sites.Site',
+        'usgs_sites.Site',
         on_delete=models.CASCADE,
         related_name='approval_requests',
     )

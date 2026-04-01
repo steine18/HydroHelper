@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sites', '0001_initial'),
+        ('usgs_sites', '0001_initial'),
     ]
 
     operations = [

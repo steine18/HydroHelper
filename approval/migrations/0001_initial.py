@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('sites', '0003_move_schedule_to_site'),
+        ('usgs_sites', '0003_move_schedule_to_site'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
@@ -26,7 +26,7 @@ class Migration(migrations.Migration):
                 ('status', models.CharField(choices=[('draft', 'Draft'), ('complete', 'Complete')], default='draft', max_length=20)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
-                ('site', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='approval_requests', to='sites.site')),
+                ('site', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='approval_requests', to='usgs_sites.site')),
                 ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='approval_requests', to=settings.AUTH_USER_MODEL)),
             ],
             options={

@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('analysis', '0002_alter_analysisreport_report_type_precipcalibration'),
-        ('sites', '0003_move_schedule_to_site'),
+        ('usgs_sites', '0003_move_schedule_to_site'),
     ]
 
     operations = [
@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('report', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='precip_comparison_sites', to='analysis.analysisreport')),
-                ('site', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='sites.site')),
+                ('site', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='usgs_sites.site')),
             ],
             options={
                 'ordering': ['site__site_no'],

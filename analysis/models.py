@@ -11,7 +11,7 @@ class StageQComparisonSite(models.Model):
         related_name='stage_q_comparison_sites',
     )
     site = models.ForeignKey(
-        'sites.Site',
+        'usgs_sites.Site',
         on_delete=models.CASCADE,
     )
 
@@ -30,7 +30,7 @@ class PrecipComparisonSite(models.Model):
         related_name='precip_comparison_sites',
     )
     site = models.ForeignKey(
-        'sites.Site',
+        'usgs_sites.Site',
         on_delete=models.CASCADE,
     )
 
@@ -68,7 +68,7 @@ class AnalysisReport(models.Model):
         related_name='analysis_reports',
     )
     site = models.ForeignKey(
-        'sites.Site',
+        'usgs_sites.Site',
         on_delete=models.CASCADE,
         related_name='analysis_reports',
     )

@@ -9,7 +9,7 @@ class RatingConfig(models.Model):
         related_name='rating_configs',
     )
     site = models.ForeignKey(
-        'sites.Site',
+        'usgs_sites.Site',
         on_delete=models.CASCADE,
         related_name='rating_configs',
     )

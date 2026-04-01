@@ -36,7 +36,7 @@ class Migration(migrations.Migration):
                 ('point_locator', models.CharField(help_text='ALERT or ALERT2 address from the Novastar Point Data Viewer.', max_length=50)),
                 ('parameter_type', models.CharField(help_text='Type of measurement (e.g. Stage, Precipitation, Discharge).', max_length=100)),
                 ('label', models.CharField(blank=True, max_length=100)),
-                ('site', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='nova_point_locators', to='sites.site')),
+                ('site', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='nova_point_locators', to='usgs_sites.site')),
             ],
             options={
                 'ordering': ['site__site_no', 'parameter_type'],
@@ -52,8 +52,8 @@ class Migration(migrations.Migration):
                 ('label', models.CharField(blank=True, max_length=100)),
                 ('notes', models.TextField(blank=True)),
                 ('created_by', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='site_relationships', to=settings.AUTH_USER_MODEL)),
-                ('downstream_site', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='upstream_relationships', to='sites.site')),
-                ('upstream_site', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='downstream_relationships', to='sites.site')),
+                ('downstream_site', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='upstream_relationships', to='usgs_sites.site')),
+                ('upstream_site', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='downstream_relationships', to='usgs_sites.site')),
             ],
             options={
                 'ordering': ['downstream_site__site_no', 'upstream_site__site_no'],

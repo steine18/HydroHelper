@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sites', '0002_nova_point_locator_schedule'),
+        ('usgs_sites', '0002_nova_point_locator_schedule'),
     ]
 
     operations = [

@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('sites', '0003_move_schedule_to_site'),
+        ('usgs_sites', '0003_move_schedule_to_site'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
@@ -25,7 +25,7 @@ class Migration(migrations.Migration):
                 ('hidden_measurement_nos', models.JSONField(default=list)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
-                ('site', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='rating_configs', to='sites.site')),
+                ('site', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='rating_configs', to='usgs_sites.site')),
                 ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='rating_configs', to=settings.AUTH_USER_MODEL)),
             ],
             options={

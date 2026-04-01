@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('analysis', '0005_add_is_complete'),
-        ('sites', '0003_move_schedule_to_site'),
+        ('usgs_sites', '0003_move_schedule_to_site'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
