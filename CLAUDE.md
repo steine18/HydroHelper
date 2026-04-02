@@ -604,3 +604,7 @@ scale:
 - [ ] Analysis data caching — precipitation and stage/discharge data is currently fetched
       live from the USGS API on every page load (no caching). Plan: add server-side caching
       with a TTL and an explicit "Refresh Data" button that busts the cache on demand
+- [ ] Set up custom domain and complete email verification — purchase a domain (e.g. via
+      Cloudflare Registrar or Namecheap), point it to Railway, add DKIM/DMARC DNS records
+      in Brevo (Senders & IP → Domains), update CSRF_TRUSTED_ORIGINS and DEFAULT_FROM_EMAIL
+      on Railway, then remove EMAIL_BACKEND override from .env to enable live email sending

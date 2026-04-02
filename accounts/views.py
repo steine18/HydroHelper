@@ -1,3 +1,4 @@
+from allauth.account.internal.flows.email_verification import send_verification_email_for_user
 from django.contrib.auth import get_user_model, login
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
@@ -20,8 +21,9 @@ def register(request):
         form = RegistrationForm(request.POST)
         if form.is_valid():
             user = form.save()
-            login(request, user)
-            return redirect("home")
+            login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+            send_verification_email_for_user(request, user)
+            return redirect('account_email_verification_sent')
     else:
         form = RegistrationForm()
     return render(request, "accounts/register.html", {"form": form})
