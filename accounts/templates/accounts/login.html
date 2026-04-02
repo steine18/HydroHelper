@@ -61,6 +61,10 @@
         <button type="submit" class="btn btn-primary w-100">Log In</button>
       </form>
 
+      <div class="text-center mt-2">
+        <a href="{% url 'account_reset_password' %}" class="small text-muted">Forgot password?</a>
+      </div>
+
       <hr class="my-3">
       <p class="text-center small mb-0">
         Don't have an account? <a href="{% url 'register' %}">Register</a>
