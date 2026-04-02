@@ -11,8 +11,17 @@ with user accounts, saved reports, and persistent site relationship configuratio
 ## Tech Stack
 
 - **Framework:** Django (chosen over Flask for built-in auth, ORM, and admin)
-- **Auth:** `django-allauth` with Google OAuth (`allauth.socialaccount.providers.google`);
-  custom user model in `accounts` app
+- **Auth:** `django-allauth` (v65.x) with Google OAuth (`allauth.socialaccount.providers.google`);
+  custom user model in `accounts` app; mandatory email verification on registration
+- **Email:** Brevo SMTP (`smtp-relay.brevo.com`, port 587); credentials via
+  `BREVO_SMTP_LOGIN` and `BREVO_SMTP_KEY` env vars; `DEFAULT_FROM_EMAIL` env var;
+  locally override with `EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend`
+  in `.env` until a sender domain is verified in Brevo
+- **Static files:** WhiteNoise (`whitenoise.middleware.WhiteNoiseMiddleware`) serves
+  static files in production; `STATIC_ROOT = BASE_DIR / 'staticfiles'`
+- **Deployment:** Railway — PostgreSQL via `DATABASE_URL` env var; `Procfile` runs
+  `migrate` + `collectstatic` on release, `gunicorn` on web; `.python-version` pins
+  Python 3.12 for Nixpacks
 - **Database:** PostgreSQL
 - **Data manipulation:** Polars (time-series, time-of-travel shifting)
 - **Visualization:** Plotly (interactive charts)
@@ -55,7 +64,26 @@ Apps planned but not yet created:
 
 ## Data Models
 
+### `accounts` app (built)
+
+- **User** — Extends `AbstractUser`. Added `tier` field (`basic` / `advanced`, default
+  `basic`). `is_advanced` property returns `True` for advanced, staff, and superuser.
+- **Tiers:**
+  - `basic` — Flow Balance Plotter, ALERT2 Dashboard, Approval Checklist, ALERT2 Parser
+  - `advanced` — all tools (adds Rating Developer and Station Analysis)
+  - Staff/superuser — always advanced; can access `/accounts/admin-tools/users/` to
+    toggle any non-superuser between basic and advanced
+- **`accounts/decorators.py`** — `advanced_required` decorator; raises 403 for basic users
+- **Views:** `register`, `account`, `add_site`, `manage_users`, `set_user_tier`
+- **Admin:** `CustomUserAdmin` registered with tier column and filter
+
 ### `sites` app (built)
+
+**Note:** The app's Django label is `usgs_sites` (set via `AppConfig.label`) to avoid
+conflicting with `django.contrib.sites` which also uses the label `sites`. All FK
+references use `'usgs_sites.Site'` and all migration dependencies use `('usgs_sites', ...)`.
+Database tables are named `usgs_sites_site`, `usgs_sites_siterelationship`,
+`usgs_sites_novapointlocator`.
 
 - **Site** — A cached USGS monitoring site (site number, name, coordinates, HUC).
   Auto-populated from the USGS site service API on first use via `get_or_fetch()`.
@@ -553,6 +581,10 @@ under a "Packet Tools" label — one for single-packet decode and one for batch 
    bare hex APDU) and batch file upload with valid/invalid assessment table
 9. ✅ Build `approval` app — standalone approval checklist with three report types,
    conditional questions, autosave, formatted report view with copy-to-clipboard
+10. ✅ Deploy to Railway — PostgreSQL, WhiteNoise static files, Procfile, gunicorn
+11. ✅ User tier system — basic/advanced tiers, staff management UI, view gating
+12. ✅ Password reset and email verification — Brevo SMTP, allauth templates, mandatory
+    verification on registration (console backend used locally until domain is verified)
 
 ---
 
