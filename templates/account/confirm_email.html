@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Confirm Email — HydroHelper{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-center align-items-start p-4">
+  <div class="card shadow-sm" style="width: 360px;">
+    <div class="card-body p-4 text-center">
+      <h5 class="card-title fw-bold mb-1">Confirm Your Email</h5>
+      {% if confirmation %}
+        <p class="text-muted small mb-4">
+          Click below to confirm <strong>{{ confirmation.email_address.email }}</strong>
+          as your email address.
+        </p>
+        <form method="post">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-primary w-100">Confirm Email</button>
+        </form>
+      {% else %}
+        <div class="alert alert-danger small mt-3">
+          This confirmation link is invalid or has expired.
+          <a href="{% url 'login' %}">Return to login.</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
