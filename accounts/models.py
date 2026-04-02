@@ -3,8 +3,15 @@ from django.db import models
 
 
 class User(AbstractUser):
-    """
-    Custom user model. Extends AbstractUser so fields can be added later
-    (e.g. USGS office, preferences) without a painful migration.
-    """
-    pass
+    TIER_BASIC = 'basic'
+    TIER_ADVANCED = 'advanced'
+    TIER_CHOICES = [
+        (TIER_BASIC, 'Basic'),
+        (TIER_ADVANCED, 'Advanced'),
+    ]
+
+    tier = models.CharField(max_length=20, choices=TIER_CHOICES, default=TIER_BASIC)
+
+    @property
+    def is_advanced(self):
+        return self.tier == self.TIER_ADVANCED or self.is_staff or self.is_superuser

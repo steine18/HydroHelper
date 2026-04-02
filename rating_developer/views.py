@@ -3,6 +3,7 @@ import json
 import plotly.graph_objects as go
 import plotly.io as pio
 from django.contrib.auth.decorators import login_required
+from accounts.decorators import advanced_required
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -96,6 +97,7 @@ def _build_rating_chart(rating_curve, rating_points, measurements, hidden_nos):
 
 
 @login_required
+@advanced_required
 def index(request):
     configs = RatingConfig.objects.filter(user=request.user).select_related('site')
     return render(request, 'rating_developer/index.html', {'configs': configs})

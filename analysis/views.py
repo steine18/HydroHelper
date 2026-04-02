@@ -7,6 +7,7 @@ import plotly.io as pio
 import polars as pl
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from accounts.decorators import advanced_required
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -662,6 +663,7 @@ def _stream_ai_all_sections(prompt):
 
 
 @login_required
+@advanced_required
 def index(request):
     return render(request, 'analysis/index.html', {
         'in_progress': AnalysisReport.objects.filter(user=request.user, is_complete=False).select_related('site'),

@@ -9,4 +9,6 @@ urlpatterns = [
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("account/", views.account, name="account"),
     path("admin-tools/add-site/", views.add_site, name="add_site"),
+    path("admin-tools/users/", views.manage_users, name="manage_users"),
+    path("admin-tools/users/<int:pk>/set-tier/", views.set_user_tier, name="set_user_tier"),
 ]

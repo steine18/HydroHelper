@@ -34,6 +34,9 @@
     {% block nav_extra %}{% endblock %}
     <div class="ms-auto">
       {% if user.is_authenticated %}
+        {% if user.is_staff %}
+          <a href="{% url 'manage_users' %}" class="btn btn-outline-light btn-sm me-2">Manage Users</a>
+        {% endif %}
         <a href="{% url 'account' %}" class="btn btn-outline-light btn-sm">{{ user.username }}</a>
       {% else %}
         <a href="{% url 'login' %}" class="btn btn-outline-light btn-sm">Log In</a>
