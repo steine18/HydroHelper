@@ -651,3 +651,9 @@ scale:
       `allauth.socialaccount.providers.google` from INSTALLED_APPS and login template;
       add `allauth.socialaccount.providers.microsoft`, register app in Azure AD,
       set MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET env vars
+- [ ] Add test suite — no tests currently exist; priorities: unit tests for USGS data
+      parsing helpers (`water_balance/usgs.py`, `rating_developer/usgs.py`), ALERT2
+      decoder (`alert2_parser/decoder.py`), and extremes computation logic
+      (`analysis/views.py`); integration tests for auth flows (registration, email
+      verification, password reset) and tier-gated views; use Django's built-in
+      `TestCase` with `pytest-django` as the test runner
