@@ -12,11 +12,12 @@ with user accounts, saved reports, and persistent site relationship configuratio
 
 - **Framework:** Django (chosen over Flask for built-in auth, ORM, and admin)
 - **Auth:** `django-allauth` (v65.x) with Google OAuth (`allauth.socialaccount.providers.google`);
-  custom user model in `accounts` app; mandatory email verification on registration
-- **Email:** Brevo SMTP (`smtp-relay.brevo.com`, port 587); credentials via
-  `BREVO_SMTP_LOGIN` and `BREVO_SMTP_KEY` env vars; `DEFAULT_FROM_EMAIL` env var;
-  locally override with `EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend`
-  in `.env` until a sender domain is verified in Brevo
+  custom user model in `accounts` app; mandatory email verification on registration;
+  `email` field has `unique=True` (migration `0003_unique_email`)
+- **Email:** Brevo SMTP (`smtp-relay.brevo.com`, port 587); login is the Brevo-generated
+  SMTP login (`a6e7f5001@smtp-brevo.com`), NOT the account Gmail — set via `BREVO_SMTP_LOGIN`
+  env var; password via `BREVO_SMTP_KEY`; `DEFAULT_FROM_EMAIL` env var;
+  `EMAIL_BACKEND` env var overrides the backend (set to console backend locally if needed)
 - **Static files:** WhiteNoise (`whitenoise.middleware.WhiteNoiseMiddleware`) serves
   static files in production; `STATIC_ROOT = BASE_DIR / 'staticfiles'`
 - **Deployment:** Railway — PostgreSQL via `DATABASE_URL` env var; `Procfile` runs
@@ -44,7 +45,7 @@ Apps that currently exist on disk:
 
 ```
 project/
-├── accounts/         # Custom user model, registration, login (django-allauth + Google OAuth)
+├── accounts/         # Custom user model, registration, login (django-allauth + Google OAuth, Microsoft OAuth planned)
 ├── sites/            # USGS site models, site relationships, Novastar point locator mappings
 ├── water_balance/    # Water balance plotter tool (built)
 ├── alert2/           # ALERT2 / Novastar dashboard tool (built)
@@ -66,8 +67,9 @@ Apps planned but not yet created:
 
 ### `accounts` app (built)
 
-- **User** — Extends `AbstractUser`. Added `tier` field (`basic` / `advanced`, default
-  `basic`). `is_advanced` property returns `True` for advanced, staff, and superuser.
+- **User** — Extends `AbstractUser`. Added `email` field with `unique=True` and `tier`
+  field (`basic` / `advanced`, default `basic`). `is_advanced` property returns `True`
+  for advanced, staff, and superuser.
 - **Tiers:**
   - `basic` — Flow Balance Plotter, ALERT2 Dashboard, Approval Checklist, ALERT2 Parser
   - `advanced` — all tools (adds Rating Developer and Station Analysis)
@@ -584,7 +586,9 @@ under a "Packet Tools" label — one for single-packet decode and one for batch 
 10. ✅ Deploy to Railway — PostgreSQL, WhiteNoise static files, Procfile, gunicorn
 11. ✅ User tier system — basic/advanced tiers, staff management UI, view gating
 12. ✅ Password reset and email verification — Brevo SMTP, allauth templates, mandatory
-    verification on registration (console backend used locally until domain is verified)
+    verification on registration; Brevo SMTP login is `a6e7f5001@smtp-brevo.com` (not
+    account Gmail); allauth email confirmation template is `account/email_confirm.html`
+    (note: NOT `confirm_email.html`)
 
 ---
 
@@ -640,3 +644,10 @@ scale:
       Cloudflare Registrar or Namecheap), point it to Railway, add DKIM/DMARC DNS records
       in Brevo (Senders & IP → Domains), update CSRF_TRUSTED_ORIGINS and DEFAULT_FROM_EMAIL
       on Railway, then remove EMAIL_BACKEND override from .env to enable live email sending
+- [ ] Style transactional emails — verification and password reset emails currently use
+      allauth's plain-text defaults; replace with branded HTML templates in
+      `templates/account/email/` (e.g. `email_confirmation_signup_message.html`)
+- [ ] Replace Google OAuth with Microsoft OAuth — remove
+      `allauth.socialaccount.providers.google` from INSTALLED_APPS and login template;
+      add `allauth.socialaccount.providers.microsoft`, register app in Azure AD,
+      set MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET env vars

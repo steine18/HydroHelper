@@ -10,6 +10,7 @@ class User(AbstractUser):
         (TIER_ADVANCED, 'Advanced'),
     ]
 
+    email = models.EmailField(unique=True)
     tier = models.CharField(max_length=20, choices=TIER_CHOICES, default=TIER_BASIC)
 
     @property

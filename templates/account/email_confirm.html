@@ -3,9 +3,9 @@
 {% block title %}Confirm Email — HydroHelper{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-center align-items-start p-4">
+<div class="d-flex justify-content-center align-items-center" style="min-height: calc(100vh - 56px);">
   <div class="card shadow-sm" style="width: 360px;">
-    <div class="card-body p-4 text-center">
+    <div class="card-body p-4">
       <h5 class="card-title fw-bold mb-1">Confirm Your Email</h5>
       {% if confirmation %}
         <p class="text-muted small mb-4">
@@ -17,7 +17,8 @@
           <button type="submit" class="btn btn-primary w-100">Confirm Email</button>
         </form>
       {% else %}
-        <div class="alert alert-danger small mt-3">
+        <p class="text-muted small mb-4">Verify your email address to activate your account.</p>
+        <div class="alert alert-danger small">
           This confirmation link is invalid or has expired.
           <a href="{% url 'login' %}">Return to login.</a>
         </div>
