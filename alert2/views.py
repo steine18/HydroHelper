@@ -2,6 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import polars as pl
+from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseForbidden
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -76,6 +77,7 @@ def _window_summary(daily_rows, end_date_str, days):
     }
 
 
+@login_required
 def index(request):
     site_no = request.GET.get("site", "").strip()
     if site_no:
@@ -83,6 +85,7 @@ def index(request):
     return render(request, "alert2/index.html")
 
 
+@login_required
 def site_data(request, site_no):
     # Handle POST: superuser adding a new point locator
     if request.method == "POST" and not request.user.is_superuser:
@@ -197,6 +200,7 @@ def site_data(request, site_no):
     return render(request, "alert2/site_data.html", context)
 
 
+@login_required
 def overview(request):
     now = datetime.now(PACIFIC)
     # Anchor the stats window to today so results match the per-site summary
@@ -260,6 +264,7 @@ def overview(request):
     return render(request, "alert2/overview.html", {"site_rows": site_rows})
 
 
+@login_required
 def summary(request, site_no):
     # Handle POST: superuser saving site-level transmit schedule
     if request.method == "POST" and request.user.is_superuser:

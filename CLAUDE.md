@@ -670,6 +670,9 @@ scale:
 - [x] Add Microsoft OAuth — implemented; Azure app registered; `VERIFIED_EMAIL = True`
       required to skip re-verification; local dev requires `sudo` to run on port 80
       since Azure doesn't allow `127.0.0.1` redirect URIs
+- [ ] Add Sentry error monitoring — install `sentry-sdk[django]`, add `SENTRY_DSN` env
+      var, initialise in `settings.py` with `DjangoIntegration`; add a `/health/` view
+      that pings the DB so Railway can verify the app is alive
 - [ ] Add test suite — no tests currently exist; priorities: unit tests for USGS data
       parsing helpers (`water_balance/usgs.py`, `rating_developer/usgs.py`), ALERT2
       decoder (`alert2_parser/decoder.py`), and extremes computation logic
