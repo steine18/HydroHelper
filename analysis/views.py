@@ -116,6 +116,15 @@ def _process_precip_site(site_no, start_dt, end_dt):
         .sort('date')
     )
 
+    if daily.is_empty():
+        return {
+            'site_no': site_no, 'unit': unit, 'total_precip': '0.00',
+            'days_with_precip': 0, 'max_day': None, 'max_day_total': '0.00',
+            'num_events': 0, 'min_event': '0.00', 'max_event': '0.00',
+            'gaps': gaps, 'estimated_periods': estimated_periods,
+            'daily_dates': [], 'daily_totals': [], 'table_rows': [], 'error': None,
+        }
+
     total_precip = daily['total'].sum()
     days_with_precip = daily.filter(pl.col('total') > 0).height
     max_row = daily.sort('total', descending=True).row(0, named=True)
@@ -387,14 +396,17 @@ def _stage_q_context(report, comparison_sites=None):
             peak_gh_val = peak_gh_row['value']
             peak_gh_dt_local = peak_gh_dt_utc + timedelta(minutes=int(peak_gh_row['tz_offset_min']))
 
+            def _fmt_date(dt):
+                return f"{dt.strftime('%b.')} {dt.day}"
+
             parts = [
                 f"Maximum discharge, {fmt_q(peak_q_val)} ft\u00b3/s, "
-                f"{peak_q_dt_local.strftime('%b. %-d')}, "
+                f"{_fmt_date(peak_q_dt_local)}, "
                 f"gage height, {gh_at_peak_q:.2f} ft.",
                 f"Maximum gage height, {peak_gh_val:.2f} ft, "
-                f"{peak_gh_dt_local.strftime('%b. %-d')}.",
+                f"{_fmt_date(peak_gh_dt_local)}.",
                 f"Minimum daily discharge, {fmt_q(daily_q['value'])} ft\u00b3/s, "
-                f"{daily_q['date'].strftime('%b. %-d')}.",
+                f"{_fmt_date(daily_q['date'])}.",
             ]
             extremes_by_wy.append({'wy_label': wy_label, 'sentence': ' '.join(parts)})
 
@@ -872,7 +884,7 @@ def add_calibration(request, pk):
     report = get_object_or_404(AnalysisReport, pk=pk, user=request.user)
     try:
         body = json.loads(request.body)
-        date = body['date']
+        date_val = datetime.strptime(body['date'], '%Y-%m-%d').date()
         desired_tips = float(body['desired_tips'])
         actual_tips = float(body['actual_tips'])
     except (json.JSONDecodeError, KeyError, ValueError):
@@ -880,7 +892,7 @@ def add_calibration(request, pk):
 
     cal = PrecipCalibration.objects.create(
         report=report,
-        date=date,
+        date=date_val,
         desired_tips=desired_tips,
         actual_tips=actual_tips,
     )
