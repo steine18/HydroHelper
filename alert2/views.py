@@ -2,6 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import polars as pl
+from django.http import HttpResponseForbidden
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
@@ -84,7 +85,9 @@ def index(request):
 
 def site_data(request, site_no):
     # Handle POST: superuser adding a new point locator
-    if request.method == "POST" and request.user.is_superuser:
+    if request.method == "POST" and not request.user.is_superuser:
+        return HttpResponseForbidden()
+    if request.method == "POST":
         point_locator = request.POST.get("point_locator", "").strip()
         parameter_type = request.POST.get("parameter_type", "").strip()
         label = request.POST.get("label", "").strip()

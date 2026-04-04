@@ -379,7 +379,7 @@ def flow_balance(request, site_number):
             s = Site.get_or_fetch(sno)
             if s.latitude and s.longitude:
                 site_meta[sno] = {"name": s.name, "lat": s.latitude, "lon": s.longitude}
-        except Exception:
+        except USGSAPIError:
             pass
 
     if site_meta:

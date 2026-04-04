@@ -295,15 +295,15 @@ def _stage_q_context(report, comparison_sites=None):
         df_clean = df.filter(pl.col('value').is_not_null() & (pl.col('value') >= 0))
         if df_clean.is_empty():
             return {'label': label, 'unit': unit_label, 'error': 'No data found.'}
-        peak_row = df_clean.sort('value', descending=True).row(0, named=True)
-        min_row = df_clean.sort('value').row(0, named=True)
+        peak_row = df_clean.row(df_clean['value'].arg_max(), named=True)
+        min_row = df_clean.row(df_clean['value'].arg_min(), named=True)
         unit = df_clean['unit'][0]
         # Use official USGS daily values if available; fall back to IV-computed mean
         dv_clean = None
         if df_dv is not None:
             dv_clean = df_dv.filter(pl.col('value').is_not_null() & (pl.col('value') >= 0))
         if dv_clean is not None and not dv_clean.is_empty():
-            min_daily_row = dv_clean.sort('value').row(0, named=True)
+            min_daily_row = dv_clean.row(dv_clean['value'].arg_min(), named=True)
             min_daily_value = f"{min_daily_row['value']:.2f}"
             min_daily_date = min_daily_row['date'].strftime('%m/%d/%Y')
         else:
@@ -313,7 +313,7 @@ def _stage_q_context(report, comparison_sites=None):
                 .agg(pl.col('value').mean().alias('mean_val'))
                 .sort('date')
             )
-            min_daily_row = daily.sort('mean_val').row(0, named=True)
+            min_daily_row = daily.row(daily['mean_val'].arg_min(), named=True)
             min_daily_value = f"{min_daily_row['mean_val']:.2f}"
             min_daily_date = min_daily_row['date'].strftime('%m/%d/%Y')
         return {
@@ -372,7 +372,7 @@ def _stage_q_context(report, comparison_sites=None):
             if df_q_wy.is_empty() or df_gh_wy.is_empty():
                 continue
 
-            peak_q_row = df_q_wy.sort('value', descending=True).row(0, named=True)
+            peak_q_row = df_q_wy.row(df_q_wy['value'].arg_max(), named=True)
             peak_q_dt_utc = peak_q_row['datetime']
             peak_q_val = peak_q_row['value']
             peak_q_dt_local = peak_q_dt_utc + timedelta(minutes=int(peak_q_row['tz_offset_min']))
@@ -389,9 +389,9 @@ def _stage_q_context(report, comparison_sites=None):
             )
             if df_dv_wy.is_empty():
                 continue
-            daily_q = df_dv_wy.sort('value').row(0, named=True)
+            daily_q = df_dv_wy.row(df_dv_wy['value'].arg_min(), named=True)
 
-            peak_gh_row = df_gh_wy.sort('value', descending=True).row(0, named=True)
+            peak_gh_row = df_gh_wy.row(df_gh_wy['value'].arg_max(), named=True)
             peak_gh_dt_utc = peak_gh_row['datetime']
             peak_gh_val = peak_gh_row['value']
             peak_gh_dt_local = peak_gh_dt_utc + timedelta(minutes=int(peak_gh_row['tz_offset_min']))

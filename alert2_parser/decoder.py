@@ -298,8 +298,6 @@ def decode_general_sensor_report(data: bytes) -> list:
     sensors = []
     offset = 0
     while offset < len(data):
-        if offset >= len(data):
-            break
         sensor_id = data[offset]
         offset += 1
         if offset >= len(data):
@@ -634,8 +632,6 @@ def _parse_tlv_sequence(data: bytes) -> list:
     tlvs = []
     offset = 0
     while offset < len(data):
-        if offset >= len(data):
-            break
         tlv_type, tbytes = read_ext_field(data, offset)
         offset += tbytes
         if offset >= len(data):
