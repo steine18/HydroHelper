@@ -605,6 +605,23 @@ under a "Packet Tools" label — one for single-packet decode and one for batch 
   warning. Low frequency in practice but worth fixing before relying on measurements
   for rating development.
 
+- **Race condition on report/approval creation** — `unique_together` constraints on
+  `AnalysisReport`, `FlowBalanceConfig`, and `SiteRelationship` are checked in Python
+  before saving, not enforced at the DB level. Two concurrent requests with identical
+  fields can both pass the uniqueness check and create duplicates. Fix: use
+  `get_or_create` inside `transaction.atomic()` and migrate to `UniqueConstraint` in
+  `Meta.constraints` (also modernises away from the deprecated `unique_together`).
+
+- **AI assist stream swallows errors silently** (`analysis/views.py`
+  `_stream_ai_response`) — If the Anthropic API fails mid-stream, the exception
+  propagates with no error event sent to the client, leaving the UI in a hung state.
+  Fix: wrap the stream in try/except and yield a `data: [ERROR]\n\n` event on failure.
+
+- **`update_dates` views accept unvalidated date strings** (`approval/views.py`,
+  `analysis/views.py`) — `period_start` and `period_end` from POST are assigned
+  directly to DateFields without parsing. An invalid date causes an unhandled 500.
+  Fix: parse with `datetime.strptime(..., '%Y-%m-%d')` and return 400 on failure.
+
 ---
 
 ## Performance Considerations
@@ -640,6 +657,15 @@ scale:
   many decades of measurements this could be slow. Consider adding date range parameters
   to the OGC API call once the API supports them, or caching the result.
 
+- **No memory limit on large data requests** — Fetching multiple years of minute-level
+  USGS data produces very large Polars DataFrames with no upper bound. A user requesting
+  10 years of data could consume several GB of memory per request. Consider capping the
+  allowed date range or streaming results rather than loading into memory.
+
+- **No background task queue** — Long-running operations (large USGS fetches, AI assist
+  generation) block the request thread. Consider Celery + Redis for background tasks if
+  the app grows to multiple concurrent users.
+
   *(Previously fixed inefficiencies: `sort().row(0)` replaced with `arg_max()`/`arg_min()`
   in `analysis/views.py`; broad `except Exception` narrowed to `USGSAPIError` in
   `water_balance/views.py`; redundant while-loop boundary checks removed in
@@ -673,6 +699,23 @@ scale:
 - [ ] Add Sentry error monitoring — install `sentry-sdk[django]`, add `SENTRY_DSN` env
       var, initialise in `settings.py` with `DjangoIntegration`; add a `/health/` view
       that pings the DB so Railway can verify the app is alive
+- [ ] Add structured logging — no `LOGGING` config exists; add a console handler so
+      500 errors, external API failures (USGS, Novastar, Anthropic), and auth events
+      produce structured log output visible in Railway's log viewer
+- [ ] Harden `SECRET_KEY` and `ALLOWED_HOSTS` for production — current defaults are
+      insecure (`'django-insecure-...'` fallback and `['*']`); ensure Railway always has
+      `SECRET_KEY` and `ALLOWED_HOSTS` env vars set; consider raising
+      `ImproperlyConfigured` if `SECRET_KEY` is missing when `DEBUG=False`
+- [ ] Enable Railway PostgreSQL backups — point-in-time recovery is not enabled by
+      default; enable it in the Railway Postgres service settings before storing real
+      user data
+- [ ] Move Anthropic model name to env var — `claude-opus-4-5` is hardcoded in
+      `analysis/views.py`; use `ANTHROPIC_MODEL = env('ANTHROPIC_MODEL', default='claude-opus-4-5')`
+      so the model can be updated without a code deploy when Anthropic releases new versions
+- [ ] Migrate `unique_together` to `UniqueConstraint` — `unique_together` is deprecated
+      in Django 3.2+; all models using it (`AnalysisReport`, `FlowBalanceConfig`,
+      `SiteRelationship`, `PrecipComparisonSite`, `StageQComparisonSite`) should migrate
+      to `Meta.constraints` with `UniqueConstraint`
 - [ ] Add test suite — no tests currently exist; priorities: unit tests for USGS data
       parsing helpers (`water_balance/usgs.py`, `rating_developer/usgs.py`), ALERT2
       decoder (`alert2_parser/decoder.py`), and extremes computation logic
