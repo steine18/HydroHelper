@@ -596,6 +596,17 @@ under a "Packet Tools" label — one for single-packet decode and one for batch 
 
 ---
 
+## Known Bugs
+
+- **Silent data loss in field measurement joining (`rating_developer/usgs.py`
+  `fetch_measurements()`)** — When joining discharge, gage height, and measurement
+  number records by `field_visit_id`, only the last record per visit is kept if
+  multiple exist. This silently discards earlier readings for the same visit with no
+  warning. Low frequency in practice but worth fixing before relying on measurements
+  for rating development.
+
+---
+
 ## Performance Considerations
 
 Known inefficiencies that are not urgent but worth addressing before production or at
@@ -628,6 +639,11 @@ scale:
   load; no date filtering at the API level (filtering is done in Python). For sites with
   many decades of measurements this could be slow. Consider adding date range parameters
   to the OGC API call once the API supports them, or caching the result.
+
+  *(Previously fixed inefficiencies: `sort().row(0)` replaced with `arg_max()`/`arg_min()`
+  in `analysis/views.py`; broad `except Exception` narrowed to `USGSAPIError` in
+  `water_balance/views.py`; redundant while-loop boundary checks removed in
+  `alert2_parser/decoder.py`; non-superuser POST in `alert2/views.py` now returns 403.)*
 
 ---
 
