@@ -63,6 +63,36 @@ def _compute_daily_stats(received_set, start_date, end_date, interval_hours, off
     return rows
 
 
+def _rolling_24h_summary(received_set, now, interval_hours, offset_minutes):
+    """Transmit reliability for the rolling 24-hour window ending at now (local time).
+    Expected slots are those scheduled within the last 24 hours, so a partial day
+    never inflates the denominator with future slots."""
+    window_end_str = now.strftime("%Y-%m-%dT%H:%M")
+    window_start = now - timedelta(hours=24)
+    window_start_str = window_start.strftime("%Y-%m-%dT%H:%M")
+
+    interval_min = interval_hours * 60
+    start_min = offset_minutes % interval_min
+
+    expected_times = []
+    for d in [window_start.date(), now.date()]:
+        m = start_min
+        while m < 24 * 60:
+            h, mn = divmod(m, 60)
+            t_str = f"{d.isoformat()}T{h:02d}:{mn:02d}"
+            if window_start_str <= t_str <= window_end_str:
+                expected_times.append(t_str)
+            m += interval_min
+
+    received = sum(1 for t in expected_times if t in received_set)
+    total_exp = len(expected_times)
+    return {
+        "expected": total_exp,
+        "received": received,
+        "pct": round(received / total_exp * 100) if total_exp else 0,
+    }
+
+
 def _window_summary(daily_rows, end_date_str, days):
     """Aggregate stats for the last `days` days up to end_date."""
     cutoff = (datetime.strptime(end_date_str, "%Y-%m-%d") - timedelta(days=days - 1)).strftime("%Y-%m-%d")
@@ -249,7 +279,11 @@ def overview(request):
                         site.transmit_interval_hours,
                         site.transmit_offset_minutes,
                     )
-                    row["summary_1d"] = _window_summary(daily_rows, end_str, 1)
+                    row["summary_1d"] = _rolling_24h_summary(
+                        received_set, now,
+                        site.transmit_interval_hours,
+                        site.transmit_offset_minutes,
+                    )
                     row["summary_7d"] = _window_summary(daily_rows, end_str, 7)
                     row["summary_30d"] = _window_summary(daily_rows, end_str, 30)
                 except NovastarAPIError as exc:
