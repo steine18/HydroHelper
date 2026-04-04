@@ -36,7 +36,7 @@ INSTALLED_APPS = [
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
-    'allauth.socialaccount.providers.google',
+    'allauth.socialaccount.providers.microsoft',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
@@ -52,18 +52,21 @@ AUTHENTICATION_BACKENDS = [
 SITE_ID = 1
 
 SOCIALACCOUNT_PROVIDERS = {
-    'google': {
+    'microsoft': {
         'APP': {
-            'client_id': env('GOOGLE_CLIENT_ID', default=''),
-            'secret':    env('GOOGLE_CLIENT_SECRET', default=''),
+            'client_id': env('MICROSOFT_CLIENT_ID', default=''),
+            'secret':    env('MICROSOFT_CLIENT_SECRET', default=''),
         },
-        'SCOPE': ['profile', 'email'],
-        'AUTH_PARAMS': {'access_type': 'online'},
+        'SCOPE': ['User.Read'],
+        'AUTH_PARAMS': {'prompt': 'select_account'},
+        'VERIFIED_EMAIL': True,
     },
 }
 
 SOCIALACCOUNT_LOGIN_ON_GET = True
 SOCIALACCOUNT_AUTO_SIGNUP = True
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
 
 ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'username*', 'password1*', 'password2*']

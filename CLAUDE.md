@@ -11,9 +11,13 @@ with user accounts, saved reports, and persistent site relationship configuratio
 ## Tech Stack
 
 - **Framework:** Django (chosen over Flask for built-in auth, ORM, and admin)
-- **Auth:** `django-allauth` (v65.x) with Google OAuth (`allauth.socialaccount.providers.google`);
-  custom user model in `accounts` app; mandatory email verification on registration;
-  `email` field has `unique=True` (migration `0003_unique_email`)
+- **Auth:** `django-allauth` (v65.x) with Microsoft OAuth
+  (`allauth.socialaccount.providers.microsoft`); custom user model in `accounts` app;
+  mandatory email verification on registration; `email` field has `unique=True`
+  (migration `0003_unique_email`); Microsoft login auto-connects to existing accounts
+  by email (`SOCIALACCOUNT_EMAIL_AUTHENTICATION = True`,
+  `SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True`,
+  `VERIFIED_EMAIL = True` in provider config)
 - **Email:** Brevo SMTP (`smtp-relay.brevo.com`, port 587); login is the Brevo-generated
   SMTP login (`a6e7f5001@smtp-brevo.com`), NOT the account Gmail — set via `BREVO_SMTP_LOGIN`
   env var; password via `BREVO_SMTP_KEY`; `DEFAULT_FROM_EMAIL` env var;
@@ -45,7 +49,7 @@ Apps that currently exist on disk:
 
 ```
 project/
-├── accounts/         # Custom user model, registration, login (django-allauth + Google OAuth, Microsoft OAuth planned)
+├── accounts/         # Custom user model, registration, login (django-allauth + Microsoft OAuth)
 ├── sites/            # USGS site models, site relationships, Novastar point locator mappings
 ├── water_balance/    # Water balance plotter tool (built)
 ├── alert2/           # ALERT2 / Novastar dashboard tool (built)
@@ -647,10 +651,9 @@ scale:
 - [ ] Style transactional emails — verification and password reset emails currently use
       allauth's plain-text defaults; replace with branded HTML templates in
       `templates/account/email/` (e.g. `email_confirmation_signup_message.html`)
-- [ ] Replace Google OAuth with Microsoft OAuth — remove
-      `allauth.socialaccount.providers.google` from INSTALLED_APPS and login template;
-      add `allauth.socialaccount.providers.microsoft`, register app in Azure AD,
-      set MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET env vars
+- [x] Add Microsoft OAuth — implemented; Azure app registered; `VERIFIED_EMAIL = True`
+      required to skip re-verification; local dev requires `sudo` to run on port 80
+      since Azure doesn't allow `127.0.0.1` redirect URIs
 - [ ] Add test suite — no tests currently exist; priorities: unit tests for USGS data
       parsing helpers (`water_balance/usgs.py`, `rating_developer/usgs.py`), ALERT2
       decoder (`alert2_parser/decoder.py`), and extremes computation logic
