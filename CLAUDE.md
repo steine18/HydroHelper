@@ -89,7 +89,7 @@ Apps planned but not yet created:
 conflicting with `django.contrib.sites` which also uses the label `sites`. All FK
 references use `'usgs_sites.Site'` and all migration dependencies use `('usgs_sites', ...)`.
 Database tables are named `usgs_sites_site`, `usgs_sites_siterelationship`,
-`usgs_sites_novapointlocator`.
+`usgs_sites_novapointlocator`, `usgs_sites_locatorgroup`.
 
 - **Site** — A cached USGS monitoring site (site number, name, coordinates, HUC).
   Auto-populated from the USGS site service API on first use via `get_or_fetch()`.
@@ -99,9 +99,14 @@ Database tables are named `usgs_sites_site`, `usgs_sites_siterelationship`,
 - **SiteRelationship** — Links an upstream site to a downstream site with a time-of-travel
   offset (`offset_minutes`). Supports `fixed` and `flow_dependent` offset types
   (flow-dependent is a future placeholder). Per-user (`created_by` FK).
-- **NovaPointLocator** — Maps a USGS site to a single Novastar point locator address.
-  A site may have multiple locators (one per sensor/parameter). Fields: `point_locator`,
-  `parameter_type`, `label`.
+- **LocatorGroup** — A named group of point locators not tied to a specific USGS site
+  (e.g. a rain gauge network or standalone sensor array). Fields: `name` (unique),
+  `transmit_interval_hours`, `transmit_offset_minutes`. Migration `0004_locatorgroup`.
+- **NovaPointLocator** — Maps a Novastar point locator address to either a USGS `Site`
+  or a `LocatorGroup` (both FKs nullable; at least one should be set). A site/group may
+  have multiple locators (one per sensor/parameter). Fields: `point_locator`,
+  `parameter_type`, `label`, `site` (nullable FK), `group` (nullable FK).
+  Unique constraints: `('site', 'point_locator')` and `('group', 'point_locator')`.
 
 ### `water_balance` app (built)
 
@@ -121,6 +126,8 @@ Database tables are named `usgs_sites_site`, `usgs_sites_siterelationship`,
   Stores report type, period, and per-section text as a JSON blob (`section_data`).
   Has a `completion_pct()` helper, a `saved_to_reports` flag, and an `is_complete`
   boolean flag (default False) for marking a report as finished.
+  Also stores `prior_period_analysis` (TextField, blank=True) — optional paste of the
+  previous period's completed analysis; used as style reference in the Copilot prompt export.
   Unique constraint on `(user, site, period_start, period_end)` — duplicate reports
   for the same user/site/dates are blocked at the DB level; the new report form and
   edit-dates view redirect to the existing report instead of raising an error.
@@ -228,10 +235,13 @@ with transmit reliability tracking.
 **Key features:**
 - Site lookup by USGS site number; point locators fetched from `NovaPointLocator` records
 - **Site data view** — table of all readings for a date range, one column per sensor
-- **Overview view** — all configured sites with 1-day / 7-day / 30-day transmit
-  reliability summaries
-- **Summary view** — per-site daily transmit stats for a configurable date range;
+- **Overview view** — all configured sites and groups with 1-day / 7-day / 30-day transmit
+  reliability summaries; rows are normalised to a common `all_rows` list with `detail_url`,
+  `summary_url`, `display_name`, `display_subtitle` so the template handles both types uniformly
+- **Summary view** — per-site/group daily transmit stats for a configurable date range;
   superusers can set the transmit schedule (`interval_hours`, `offset_minutes`) here
+- **Group data view** (`alert2_group_data`) — same as site data view but for a `LocatorGroup`
+- **Group summary view** (`alert2_group_summary`) — same as site summary view but for a group
 - Superusers can add new point locators directly from the site data UI
 - Point locator mappings stored in `sites.NovaPointLocator` (not in `alert2` app)
 
@@ -254,14 +264,18 @@ with transmit reliability tracking.
 - **Delete** — deletes the report with a confirmation dialog
 - **Edit dates** — inline date pickers in the report header; conflicts redirect to
   the existing report rather than saving
-- **AI Assist** — single button that generates or improves all sections in one pass,
-  streamed in real time directly into each section's textarea with autosave per section.
-  Controlled by the `analysis.can_use_ai_assist` Django permission (see below).
-- **Export Prompt (Claude)** — downloads the AI prompt as a `.txt` file optimised for
-  Claude.ai; uses `[SECTION:key]` markers and ALL-CAPS data blocks.
-- **Export Prompt (Copilot)** — downloads a GPT-optimised prompt; uses markdown `##`
-  headings, suppresses preamble/closing remarks, no routing markers.
+- **Export Prompt** — downloads a GPT/Copilot-optimised prompt as a `.txt` file; uses
+  markdown `##` headings, suppresses preamble/closing remarks, no routing markers.
+  Includes full daily mean table, full instantaneous values table (station local time),
+  and comparison site discharge tables. Prior period analysis (if entered) is included
+  as a style/tone reference block.
+- **Prior Period Analysis** — optional textarea at the bottom of the report; paste the
+  previous period's completed analysis here; content is auto-saved (600ms debounce) and
+  fed into the prompt export as a style reference only (not for data values).
 - Progress indicator shows % of sections with non-empty text
+- Note: AI Assist (Claude streaming) and Export Prompt (Claude) buttons have been removed;
+  only the Copilot/GPT export is available in the UI. The `ai_assist` and `ai_assist_all`
+  view endpoints still exist in `analysis/views.py` but are no longer linked from the template.
 
 **Report types** are defined in `analysis/report_types.py` — adding a new type means
 adding one dict entry there, no other changes needed. Current types:
@@ -368,10 +382,14 @@ adding one dict entry there, no other changes needed. Current types:
 - Rain events computed in `_process_precip_site()` as contiguous runs of days with precip > 0
 - The same data and rules are included in both exported prompt formats
 
-**Prompt building** — `_build_all_sections_prompt(report)` in `analysis/views.py` is the
-single source of truth for the Claude AI prompt. `_build_copilot_prompt(report)` mirrors
-it with markdown formatting for GPT-based models. Both `ai_assist_all` and `export_prompt`
-call the appropriate builder.
+**Prompt building** — `_build_copilot_prompt(report)` in `analysis/views.py` builds the
+Copilot/GPT prompt with markdown formatting. `_build_all_sections_prompt(report)` builds
+the legacy Claude prompt (still used by `ai_assist_all` but no longer exported to users).
+`_daily_series(df_dv, df_iv)` and `_iv_series(df)` are shared helpers that build the daily
+and instantaneous value tables; `_iv_series` converts UTC datetimes to station local time
+using the per-row `tz_offset_min` column from `fetch_iv()`.
+Both prompt builders fetch `StageQComparisonSite` records and pass them to `_stage_q_context`
+so comparison site discharge (daily + IV) is included in the exported prompt.
 
 **USGS IV API** — `fetch_iv()` in `water_balance/usgs.py` returns a DataFrame with columns:
 `site_no`, `datetime` (UTC), `value`, `unit`, `qualifiers` (comma-joined, e.g. `"A,e"`),
@@ -630,13 +648,13 @@ Known inefficiencies that are not urgent but worth addressing before production 
 scale:
 
 - **Cross-request data re-fetching (`analysis/views.py`)** — The USGS API is called
-  on every request with no caching. Loading a report page, clicking AI Assist, and
-  exporting either prompt each independently re-fetch the same precipitation or
-  stage/discharge data. The data-fetch logic for prompts is now consolidated into
-  `_get_precip_data(report)` (refactored) and `_stage_q_context(report)`, but no
-  TTL cache exists yet. Adding a short-lived server-side cache (e.g. Django's cache
-  framework with a 5–15 min TTL keyed on `(site_no, param, start, end)`) plus a
-  "Refresh Data" button would eliminate redundant external API round-trips.
+  on every request with no caching. Loading a report page and exporting the prompt each
+  independently re-fetch the same precipitation or stage/discharge data. The data-fetch
+  logic for prompts is consolidated into `_get_precip_data(report)` (refactored) and
+  `_stage_q_context(report)`, but no TTL cache exists yet. Adding a short-lived
+  server-side cache (e.g. Django's cache framework with a 5–15 min TTL keyed on
+  `(site_no, param, start, end)`) plus a "Refresh Data" button would eliminate redundant
+  external API round-trips.
 
 - **`_precip_context` and `_get_precip_data` both fetch comparison sites** — When
   `report_detail` renders the page, `_precip_context` fetches comparison site data
@@ -645,11 +663,9 @@ scale:
   there is no duplication within a single request, but if a view ever needs both the
   chart context and the prompt data in the same request, there would be a double fetch.
 
-- **Stage/discharge prompt builders call `_stage_q_context` without comparison sites**
-  — `_build_all_sections_prompt` and `_build_copilot_prompt` call `_stage_q_context(report)`
-  with no comparison sites, so comparison discharge data does not appear in the AI prompt
-  even if comparison sites are configured. This is consistent but worth revisiting if
-  richer prompt context is desired.
+- **`_build_all_sections_prompt` (Claude prompt) still omits comparison sites** — only
+  `_build_copilot_prompt` passes `StageQComparisonSite` records to `_stage_q_context`.
+  The Claude prompt builder could be updated similarly if richer context is ever desired.
 
 - **`fetch_measurements` in `rating_developer/usgs.py` fetches all historical measurements
   on every call** — Called from `analysis/views.py` on every stage/discharge report page

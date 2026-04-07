@@ -214,6 +214,55 @@ def _water_years_in_range(start_date, end_date):
     return result
 
 
+def _daily_series(df_dv, df_iv):
+    """
+    Return a list of {'date': 'MM/DD/YYYY', 'value': float} for every day,
+    preferring official DV daily means; falls back to IV-computed daily means.
+    """
+    dv_clean = df_dv.filter(pl.col('value').is_not_null() & (pl.col('value') >= 0))
+    if not dv_clean.is_empty():
+        return [
+            {'date': row['date'].strftime('%m/%d/%Y'), 'value': row['value']}
+            for row in dv_clean.sort('date').to_dicts()
+        ]
+    iv_clean = df_iv.filter(pl.col('value').is_not_null() & (pl.col('value') >= 0))
+    if iv_clean.is_empty():
+        return []
+    daily = (
+        iv_clean.with_columns(pl.col('datetime').dt.date().alias('date'))
+        .group_by('date')
+        .agg(pl.col('value').mean().alias('value'))
+        .sort('date')
+    )
+    return [
+        {'date': row['date'].strftime('%m/%d/%Y'), 'value': row['value']}
+        for row in daily.to_dicts()
+    ]
+
+
+def _iv_series(df):
+    """
+    Return a list of {'datetime': 'MM/DD/YYYY HH:MM', 'value': float}
+    from an IV DataFrame, sorted by datetime and converted to station local time
+    using the per-row tz_offset_min column embedded by fetch_iv().
+    Also returns a 'tz_label' string (e.g. '-07:00') derived from the first record.
+    """
+    clean = df.filter(pl.col('value').is_not_null() & (pl.col('value') >= 0))
+    if clean.is_empty():
+        return [], ''
+    rows = clean.sort('datetime').to_dicts()
+    first_offset = int(rows[0].get('tz_offset_min', 0) or 0)
+    h, m = divmod(abs(first_offset), 60)
+    sign = '-' if first_offset < 0 else '+'
+    tz_label = f"{sign}{h:02d}:{m:02d}"
+    series = []
+    for row in rows:
+        offset = int(row.get('tz_offset_min', 0) or 0)
+        local_dt = row['datetime'] + timedelta(minutes=offset)
+        series.append({'datetime': local_dt.strftime('%m/%d/%Y %H:%M'), 'value': row['value']})
+    return series, tz_label
+
+
 def _process_stage_q_site(site_no, start_dt, end_dt):
     """
     Fetch discharge IV and DV data for one comparison site.
@@ -249,6 +298,7 @@ def _process_stage_q_site(site_no, start_dt, end_dt):
         min_daily_value = f"{min_daily_row['mean_val']:.2f}"
         min_daily_date = min_daily_row['date'].strftime('%m/%d/%Y')
 
+    iv_series, tz_label = _iv_series(df_clean)
     return {
         'site_no': site_no,
         'unit': unit,
@@ -258,6 +308,9 @@ def _process_stage_q_site(site_no, start_dt, end_dt):
         'min_datetime': min_row['datetime'].strftime('%m/%d/%Y %H:%M UTC'),
         'min_daily_value': min_daily_value,
         'min_daily_date': min_daily_date,
+        'daily_series': _daily_series(df_q_dv, df_clean),
+        'iv_series': iv_series,
+        'tz_label': tz_label,
         'datetimes': df_clean['datetime'].to_list(),
         'values': df_clean['value'].to_list(),
         'error': None,
@@ -337,6 +390,10 @@ def _stage_q_context(report, comparison_sites=None):
     df_gh_dv_period = df_gh_dv.filter((pl.col('date') >= period_start) & (pl.col('date') <= period_end))
     discharge_stats = _stats(df_q_period, 'Discharge', 'cfs', df_dv=df_q_dv_period)
     stage_stats = _stats(df_gh_period, 'Gage Height', 'ft', df_dv=df_gh_dv_period)
+    discharge_daily = _daily_series(df_q_dv_period, df_q_period)
+    stage_daily = _daily_series(df_gh_dv_period, df_gh_period)
+    discharge_iv, tz_label = _iv_series(df_q_period)
+    stage_iv, _ = _iv_series(df_gh_period)
 
     df_q_clean = df_q.filter(pl.col('value').is_not_null() & (pl.col('value') >= 0))
     df_gh_clean = df_gh.filter(pl.col('value').is_not_null() & (pl.col('value') >= 0))
@@ -502,6 +559,11 @@ def _stage_q_context(report, comparison_sites=None):
         'extended': data_start < period_start,
         'discharge': discharge_stats,
         'stage': stage_stats,
+        'discharge_daily': discharge_daily,
+        'stage_daily': stage_daily,
+        'discharge_iv': discharge_iv,
+        'stage_iv': stage_iv,
+        'tz_label': tz_label,
         'wy_stats': wy_stats,
         'extremes_by_wy': extremes_by_wy,
         'comparisons': comparisons,
@@ -1262,36 +1324,71 @@ def _build_copilot_prompt(report):
         sq_comps = list(StageQComparisonSite.objects.filter(report=report).select_related('site'))
         ctx = _stage_q_context(report, comparison_sites=sq_comps)
         if not ctx.get('error'):
-            lines = [f"## Observed Stage/Discharge Data ({ctx['data_start']} to {ctx['data_end']})"]
-            if ctx['extended']:
-                lines.append(
-                    f"*Data extended back to water year start ({ctx['data_start']}) "
-                    f"because the analysis period crosses Oct 1.*"
-                )
+            lines = [f"## Observed Stage/Discharge Data — Analysis Period: {ctx['period_start']} to {ctx['period_end']}"]
             lines.append(f"\n**Primary site:** {report.site.site_no} — {report.site.name}")
+
+            # Summary stats
             for key in ('discharge', 'stage'):
                 s = ctx[key]
                 if s.get('error'):
                     lines.append(f"- **{s['label']}:** {s['error']}")
                 else:
-                    lines.append(f"\n**{s['label']} ({s['unit']}):**")
+                    lines.append(f"\n**{s['label']} ({s['unit']}) — summary:**")
                     lines.append(f"- Peak: {s['peak_value']} on {s['peak_datetime']}")
                     lines.append(f"- Minimum instantaneous: {s['min_value']} on {s['min_datetime']}")
                     lines.append(f"- Minimum daily mean: {s['min_daily_value']} on {s['min_daily_date']}")
+
+            # Daily mean values — primary site
+            if ctx.get('discharge_daily') or ctx.get('stage_daily'):
+                lines.append("\n**Primary site — daily mean values (analysis period):**")
+                lines.append("Date       | Discharge (cfs) | Gage Height (ft)")
+                lines.append("---------- | --------------- | ----------------")
+                q_by_date = {r['date']: r['value'] for r in ctx.get('discharge_daily', [])}
+                gh_by_date = {r['date']: r['value'] for r in ctx.get('stage_daily', [])}
+                for d in sorted(set(q_by_date) | set(gh_by_date)):
+                    q_val = f"{q_by_date[d]:.2f}" if d in q_by_date else '—'
+                    gh_val = f"{gh_by_date[d]:.2f}" if d in gh_by_date else '—'
+                    lines.append(f"{d} | {q_val:>15} | {gh_val:>16}")
+
+            # Instantaneous values — primary site
+            if ctx.get('discharge_iv') or ctx.get('stage_iv'):
+                tz = ctx.get('tz_label', 'local')
+                lines.append(f"\n**Primary site — instantaneous values (analysis period, {tz}):**")
+                lines.append(f"Date/Time ({tz})    | Discharge (cfs) | Gage Height (ft)")
+                lines.append("------------------ | --------------- | ----------------")
+                q_by_dt = {r['datetime']: r['value'] for r in ctx.get('discharge_iv', [])}
+                gh_by_dt = {r['datetime']: r['value'] for r in ctx.get('stage_iv', [])}
+                for dt in sorted(set(q_by_dt) | set(gh_by_dt)):
+                    q_val = f"{q_by_dt[dt]:.2f}" if dt in q_by_dt else '—'
+                    gh_val = f"{gh_by_dt[dt]:.2f}" if dt in gh_by_dt else '—'
+                    lines.append(f"{dt} | {q_val:>15} | {gh_val:>16}")
+
+            # Comparison sites
             if ctx.get('comparisons'):
-                lines.append("\n**Comparison sites (analysis period discharge):**")
                 for comp in ctx['comparisons']:
                     site_label = next(
                         (f"{cs.site.site_no} — {cs.site.name}" for cs in sq_comps if cs.site.site_no == comp['site_no']),
                         comp['site_no'],
                     )
+                    lines.append(f"\n**Comparison site: {site_label}**")
                     if comp.get('error'):
-                        lines.append(f"- Site {site_label}: data unavailable ({comp['error']})")
+                        lines.append(f"Data unavailable: {comp['error']}")
                     else:
-                        lines.append(f"\n**Site {site_label} ({comp['unit']}):**")
-                        lines.append(f"- Peak: {comp['peak_value']} on {comp['peak_datetime']}")
-                        lines.append(f"- Minimum instantaneous: {comp['min_value']} on {comp['min_datetime']}")
-                        lines.append(f"- Minimum daily mean: {comp['min_daily_value']} on {comp['min_daily_date']}")
+                        lines.append(f"- Peak: {comp['peak_value']} {comp['unit']} on {comp['peak_datetime']}")
+                        lines.append(f"- Minimum instantaneous: {comp['min_value']} {comp['unit']} on {comp['min_datetime']}")
+                        lines.append(f"- Minimum daily mean: {comp['min_daily_value']} {comp['unit']} on {comp['min_daily_date']}")
+                        if comp.get('daily_series'):
+                            lines.append(f"\nDate       | Discharge ({comp['unit']})")
+                            lines.append("---------- | ---------------")
+                            for r in comp['daily_series']:
+                                lines.append(f"{r['date']} | {r['value']:>15.2f}")
+                        if comp.get('iv_series'):
+                            comp_tz = comp.get('tz_label', 'local')
+                            lines.append(f"\nDate/Time ({comp_tz})    | Discharge ({comp['unit']})")
+                            lines.append("------------------ | ---------------")
+                            for r in comp['iv_series']:
+                                lines.append(f"{r['datetime']} | {r['value']:>15.2f}")
+
             if ctx.get('extremes_by_wy'):
                 lines.append("\n**Auto-generated Extremes (use only this text for the Extremes section — do not alter or add to it):**")
                 for wy in ctx['extremes_by_wy']:
