@@ -410,11 +410,11 @@ def _stage_q_context(report, comparison_sites=None):
             ]
             extremes_by_wy.append({'wy_label': wy_label, 'sentence': ' '.join(parts)})
 
-    # Fetch comparison site data
+    # Fetch comparison site data — use analysis period only, not the extended WY range
     comparisons = []
     if comparison_sites:
         for cs in comparison_sites:
-            comparisons.append(_process_stage_q_site(cs.site.site_no, start_dt, end_dt))
+            comparisons.append(_process_stage_q_site(cs.site.site_no, period_start_dt, period_end_dt))
 
     # Field measurements filtered to the analysis period
     measurements = []
@@ -918,6 +918,20 @@ def delete_calibration(request, pk, cal_pk):
 
 @login_required
 @require_POST
+def save_prior_period(request, pk):
+    report = get_object_or_404(AnalysisReport, pk=pk, user=request.user)
+    try:
+        body = json.loads(request.body)
+        text = body.get('text', '')
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
+    report.prior_period_analysis = text
+    report.save(update_fields=['prior_period_analysis', 'updated_at'])
+    return JsonResponse({'ok': True})
+
+
+@login_required
+@require_POST
 def autosave(request, pk):
     report = get_object_or_404(AnalysisReport, pk=pk, user=request.user)
     rt = REPORT_TYPES_BY_ID.get(report.report_type, {})
@@ -1045,7 +1059,8 @@ def _build_all_sections_prompt(report):
     # Stage/discharge data block
     stage_q_data_text = ''
     if report.report_type == 'stage_discharge':
-        ctx = _stage_q_context(report)
+        sq_comps = list(StageQComparisonSite.objects.filter(report=report).select_related('site'))
+        ctx = _stage_q_context(report, comparison_sites=sq_comps)
         if not ctx.get('error'):
             lines = [f"STAGE/DISCHARGE DATA ({ctx['data_start']} to {ctx['data_end']})"]
             if ctx['extended']:
@@ -1053,6 +1068,7 @@ def _build_all_sections_prompt(report):
                     f"  Note: data extended back to water year start "
                     f"({ctx['data_start']}) because the analysis period crosses Oct 1."
                 )
+            lines.append(f"\n  PRIMARY SITE: {report.site.site_no} — {report.site.name}")
             for key in ('discharge', 'stage'):
                 s = ctx[key]
                 if s.get('error'):
@@ -1062,6 +1078,20 @@ def _build_all_sections_prompt(report):
                     lines.append(f"    Peak: {s['peak_value']} on {s['peak_datetime']}")
                     lines.append(f"    Minimum instantaneous: {s['min_value']} on {s['min_datetime']}")
                     lines.append(f"    Minimum daily mean: {s['min_daily_value']} on {s['min_daily_date']}")
+            if ctx.get('comparisons'):
+                lines.append("\n  COMPARISON SITES (analysis period discharge):")
+                for comp in ctx['comparisons']:
+                    site_label = next(
+                        (f"{cs.site.site_no} — {cs.site.name}" for cs in sq_comps if cs.site.site_no == comp['site_no']),
+                        comp['site_no'],
+                    )
+                    if comp.get('error'):
+                        lines.append(f"  Site {site_label}: data unavailable ({comp['error']})")
+                    else:
+                        lines.append(f"  Site {site_label} ({comp['unit']}):")
+                        lines.append(f"    Peak: {comp['peak_value']} on {comp['peak_datetime']}")
+                        lines.append(f"    Minimum instantaneous: {comp['min_value']} on {comp['min_datetime']}")
+                        lines.append(f"    Minimum daily mean: {comp['min_daily_value']} on {comp['min_daily_date']}")
             if ctx.get('extremes_by_wy'):
                 lines.append("\n  AUTO-GENERATED EXTREMES (use only this text for the Extremes section — do not alter or add to it):")
                 for wy in ctx['extremes_by_wy']:
@@ -1229,7 +1259,8 @@ def _build_copilot_prompt(report):
     # ---- Reuse the same data-gathering logic as the Claude prompt ----
     stage_q_data_text = ''
     if report.report_type == 'stage_discharge':
-        ctx = _stage_q_context(report)
+        sq_comps = list(StageQComparisonSite.objects.filter(report=report).select_related('site'))
+        ctx = _stage_q_context(report, comparison_sites=sq_comps)
         if not ctx.get('error'):
             lines = [f"## Observed Stage/Discharge Data ({ctx['data_start']} to {ctx['data_end']})"]
             if ctx['extended']:
@@ -1237,6 +1268,7 @@ def _build_copilot_prompt(report):
                     f"*Data extended back to water year start ({ctx['data_start']}) "
                     f"because the analysis period crosses Oct 1.*"
                 )
+            lines.append(f"\n**Primary site:** {report.site.site_no} — {report.site.name}")
             for key in ('discharge', 'stage'):
                 s = ctx[key]
                 if s.get('error'):
@@ -1246,6 +1278,20 @@ def _build_copilot_prompt(report):
                     lines.append(f"- Peak: {s['peak_value']} on {s['peak_datetime']}")
                     lines.append(f"- Minimum instantaneous: {s['min_value']} on {s['min_datetime']}")
                     lines.append(f"- Minimum daily mean: {s['min_daily_value']} on {s['min_daily_date']}")
+            if ctx.get('comparisons'):
+                lines.append("\n**Comparison sites (analysis period discharge):**")
+                for comp in ctx['comparisons']:
+                    site_label = next(
+                        (f"{cs.site.site_no} — {cs.site.name}" for cs in sq_comps if cs.site.site_no == comp['site_no']),
+                        comp['site_no'],
+                    )
+                    if comp.get('error'):
+                        lines.append(f"- Site {site_label}: data unavailable ({comp['error']})")
+                    else:
+                        lines.append(f"\n**Site {site_label} ({comp['unit']}):**")
+                        lines.append(f"- Peak: {comp['peak_value']} on {comp['peak_datetime']}")
+                        lines.append(f"- Minimum instantaneous: {comp['min_value']} on {comp['min_datetime']}")
+                        lines.append(f"- Minimum daily mean: {comp['min_daily_value']} on {comp['min_daily_date']}")
             if ctx.get('extremes_by_wy'):
                 lines.append("\n**Auto-generated Extremes (use only this text for the Extremes section — do not alter or add to it):**")
                 for wy in ctx['extremes_by_wy']:
@@ -1332,6 +1378,14 @@ def _build_copilot_prompt(report):
     else:
         example_block = ''
 
+    # ---- Prior period analysis block ----
+    prior_block = ''
+    if report.prior_period_analysis.strip():
+        prior_block = (
+            f"## Prior Period Analysis (style and tone reference only — do not copy its data values)\n\n"
+            f"{report.prior_period_analysis.strip()}\n\n"
+        )
+
     return (
         f"You are assisting a USGS hydrographer in writing a formal station analysis report.\n\n"
         f"**Site:** {report.site.site_no} — {report.site.name}\n"
@@ -1339,6 +1393,7 @@ def _build_copilot_prompt(report):
         f"**Analysis period:** {report.period_start} to {report.period_end}\n"
         f"{data_section}"
         f"{example_block}"
+        f"{prior_block}"
         f"## Instructions\n\n"
         f"Write or improve all sections of this report. "
         f"For sections that already have text, refine and improve it. "

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import NovaPointLocator, Site, SiteRelationship
+from .models import LocatorGroup, NovaPointLocator, Site, SiteRelationship
 
 
 @admin.register(Site)
@@ -23,8 +23,15 @@ class SiteRelationshipAdmin(admin.ModelAdmin):
     autocomplete_fields = ('upstream_site', 'downstream_site')
 
 
+@admin.register(LocatorGroup)
+class LocatorGroupAdmin(admin.ModelAdmin):
+    list_display  = ('name', 'transmit_interval_hours', 'transmit_offset_minutes')
+    search_fields = ('name',)
+    inlines       = [NovaPointLocatorInline]
+
+
 @admin.register(NovaPointLocator)
 class NovaPointLocatorAdmin(admin.ModelAdmin):
-    list_display  = ('site', 'point_locator', 'parameter_type', 'label')
+    list_display  = ('site', 'group', 'point_locator', 'parameter_type', 'label')
     list_filter   = ('parameter_type',)
-    search_fields = ('site__site_no', 'point_locator', 'label')
+    search_fields = ('site__site_no', 'group__name', 'point_locator', 'label')

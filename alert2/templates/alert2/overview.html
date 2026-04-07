@@ -21,12 +21,12 @@
     <a href="{% url 'alert2_index' %}" class="btn btn-outline-secondary btn-sm">Single Site</a>
   </div>
 
-  {% if site_rows %}
+  {% if all_rows %}
   <div class="table-responsive">
     <table class="table table-sm table-bordered table-hover align-middle">
       <thead class="table-light">
         <tr>
-          <th>Site</th>
+          <th>Site / Group</th>
           <th>Sensor</th>
           <th>Point ID</th>
           <th>Schedule</th>
@@ -38,22 +38,23 @@
         </tr>
       </thead>
       <tbody>
-        {% for site_row in site_rows %}
-          {% for sensor in site_row.sensor_rows %}
+        {% for row in all_rows %}
+          {% for sensor in row.sensor_rows %}
           <tr {% if forloop.first %}class="site-header"{% endif %}>
             {% if forloop.first %}
-            <td rowspan="{{ site_row.sensor_rows|length }}" class="site-header fw-semibold">
-              <a href="{% url 'alert2_site_data' site_no=site_row.site.site_no %}"
-                 class="text-decoration-none">{{ site_row.site.site_no }}</a>
-              <div class="text-muted fw-normal small">{{ site_row.site.name }}</div>
+            <td rowspan="{{ row.sensor_rows|length }}" class="site-header fw-semibold">
+              <a href="{{ row.detail_url }}" class="text-decoration-none">{{ row.display_name }}</a>
+              {% if row.display_subtitle %}
+              <div class="text-muted fw-normal small">{{ row.display_subtitle }}</div>
+              {% endif %}
             </td>
             {% endif %}
             <td>{{ sensor.label }}</td>
             <td class="text-muted small">{{ sensor.point_locator }}</td>
             <td class="text-muted small">
-              {% if site_row.site.transmit_interval_hours %}
-                Every {{ site_row.site.transmit_interval_hours }}h
-                at :{{ site_row.site.transmit_offset_minutes|stringformat:"02d" }}
+              {% if row.transmit_interval_hours %}
+                Every {{ row.transmit_interval_hours }}h
+                at :{{ row.transmit_offset_minutes|stringformat:"02d" }}
               {% else %}
                 <span class="text-warning">Not set</span>
               {% endif %}
@@ -95,7 +96,7 @@
     </table>
   </div>
   {% else %}
-  <div class="alert alert-info">No sites with Novastar point locators have been configured yet.</div>
+  <div class="alert alert-info">No sites or groups with Novastar point locators have been configured yet.</div>
   {% endif %}
 
 </div>

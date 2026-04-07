@@ -76,6 +76,10 @@ class AnalysisReport(models.Model):
     period_start = models.DateField()
     period_end = models.DateField()
     section_data = models.JSONField(default=dict)
+    prior_period_analysis = models.TextField(
+        blank=True,
+        help_text="Optional: paste the previous period's analysis text here to use as style reference in the Copilot prompt export.",
+    )
     saved_to_reports = models.BooleanField(default=False)
     is_complete = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

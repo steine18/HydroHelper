@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}ALERT2 — {{ site_no }}{% if site_name %} {{ site_name }}{% endif %} — HydroHelper{% endblock %}
+{% block title %}ALERT2 — {{ display_name }} — HydroHelper{% endblock %}
 
 {% block extra_style %}
 .table-sensor th { background-color: #f8f9fa; }
@@ -10,9 +10,7 @@ td.sensor-col { border-left: 2px solid #dee2e6; }
 {% endblock %}
 
 {% block nav_extra %}
-<span class="text-white ms-3 fw-semibold">
-  {{ site_no }}{% if site_name %} — {{ site_name }}{% endif %}
-</span>
+<span class="text-white ms-3 fw-semibold">{{ display_name }}</span>
 {% endblock %}
 
 {% block content %}

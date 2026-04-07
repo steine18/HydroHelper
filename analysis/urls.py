@@ -7,6 +7,7 @@ urlpatterns = [
     path('new/', views.new_report, name='analysis_new'),
     path('<int:pk>/', views.report_detail, name='analysis_detail'),
     path('<int:pk>/autosave/', views.autosave, name='analysis_autosave'),
+    path('<int:pk>/prior-period/', views.save_prior_period, name='analysis_save_prior_period'),
     path('<int:pk>/ai_assist/<str:section_key>/', views.ai_assist, name='analysis_ai_assist'),
     path('<int:pk>/ai_assist_all/', views.ai_assist_all, name='analysis_ai_assist_all'),
     path('<int:pk>/complete/', views.toggle_complete, name='analysis_toggle_complete'),

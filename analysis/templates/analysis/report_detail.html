@@ -57,24 +57,12 @@
         <div class="progress-bar bg-success" id="completion-bar" style="width: {{ completion_pct }}%;"></div>
       </div>
       <span class="text-muted small" id="completion-label">{{ completion_pct }}% complete</span>
-      {% if can_ai_assist %}
-      <button class="btn btn-sm btn-primary" id="ai-assist-all-btn"
-              data-url="{% url 'analysis_ai_assist_all' report.pk %}">
-        AI Assist
-      </button>
-      {% endif %}
-      <a class="btn btn-sm btn-outline-secondary"
-         href="{% url 'analysis_export_prompt' report.pk %}"
-         title="Download the AI prompt as a text file to paste into Claude.ai">
-        Export Prompt (Claude)
-      </a>
       <a class="btn btn-sm btn-outline-secondary"
          href="{% url 'analysis_export_prompt_copilot' report.pk %}"
          title="Download a Copilot-optimised prompt as a text file">
-        Export Prompt (Copilot)
+        Export Prompt
       </a>
     </div>
-    <div id="ai-assist-status" class="text-muted small mt-1" style="display:none;"></div>
   </div>
 
   <!-- Site Data Panel (stage/discharge) -->
@@ -555,6 +543,20 @@
   </div>
   {% endfor %}
 
+  <!-- Prior Period Analysis -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header py-2 d-flex justify-content-between align-items-center">
+      <span class="fw-semibold">Prior Period Analysis <span class="text-muted fw-normal small">(optional — used as style reference in Copilot prompt export)</span></span>
+      <span class="text-muted small autosave-status" id="status-prior-period"></span>
+    </div>
+    <div class="card-body pb-2">
+      <textarea id="prior-period-textarea"
+                class="form-control section-textarea"
+                rows="10"
+                placeholder="Paste the previous period's completed analysis report here…">{{ report.prior_period_analysis }}</textarea>
+    </div>
+  </div>
+
 </div>
 {% endblock %}
 
@@ -782,6 +784,30 @@
     document.querySelectorAll('.cal-delete-btn').forEach(attachDeleteHandler);
   }
 
+  // --- Prior period analysis autosave ---
+  (function () {
+    const ta = document.getElementById('prior-period-textarea');
+    const status = document.getElementById('status-prior-period');
+    if (!ta) return;
+    let timer;
+    ta.addEventListener('input', () => {
+      clearTimeout(timer);
+      status.textContent = 'Unsaved…';
+      timer = setTimeout(async () => {
+        try {
+          const resp = await fetch("{% url 'analysis_save_prior_period' report.pk %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+            body: JSON.stringify({ text: ta.value }),
+          });
+          status.textContent = resp.ok ? 'Saved' : 'Save error';
+        } catch {
+          status.textContent = 'Save error';
+        }
+      }, 600);
+    });
+  })();
+
   // --- Edit dates toggle ---
   document.getElementById('edit-dates-btn')?.addEventListener('click', () => {
     document.getElementById('date-edit-form').classList.remove('d-none');
@@ -792,105 +818,5 @@
     document.getElementById('edit-dates-btn').style.display = '';
   });
 
-  // --- AI Assist All Sections ---
-  const aiAllBtn = document.getElementById('ai-assist-all-btn');
-  const aiStatus = document.getElementById('ai-assist-status');
-
-  async function autosaveSection(key, text) {
-    const ta = document.getElementById(`textarea-${key}`);
-    if (!ta) return;
-    const url = ta.dataset.autosaveUrl;
-    const statusEl = document.getElementById(`status-${key}`);
-    statusEl.textContent = 'Saving…';
-    try {
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
-        body: JSON.stringify({ section_key: key, text }),
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        statusEl.textContent = 'Saved';
-        document.getElementById('completion-bar').style.width = data.completion_pct + '%';
-        document.getElementById('completion-label').textContent = data.completion_pct + '% complete';
-      } else {
-        statusEl.textContent = 'Save error';
-      }
-    } catch {
-      statusEl.textContent = 'Save error';
-    }
-  }
-
-  if (aiAllBtn) {
-    aiAllBtn.addEventListener('click', async () => {
-      aiAllBtn.disabled = true;
-      aiAllBtn.textContent = 'Generating…';
-      aiStatus.style.display = 'block';
-      aiStatus.textContent = 'Starting AI generation…';
-
-      let currentKey = null;
-      let currentText = '';
-
-      try {
-        const resp = await fetch(aiAllBtn.dataset.url, {
-          method: 'POST',
-          headers: { 'X-CSRFToken': CSRF_TOKEN },
-        });
-
-        if (!resp.ok) {
-          aiStatus.textContent = 'Error: ' + resp.statusText;
-          return;
-        }
-
-        const reader = resp.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop();
-
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue;
-            const payload = line.slice(6);
-
-            if (payload === '[DONE]') {
-              // Save final section
-              if (currentKey) await autosaveSection(currentKey, currentText);
-              aiStatus.textContent = 'All sections generated and saved.';
-              break;
-            }
-
-            if (payload.startsWith('\u00a7SECTION:')) {
-              // Save previous section before switching
-              if (currentKey) await autosaveSection(currentKey, currentText);
-              currentKey = payload.slice(9);
-              currentText = '';
-              const ta = document.getElementById(`textarea-${currentKey}`);
-              if (ta) {
-                ta.value = '';
-                // Scroll section into view
-                document.getElementById(`section-${currentKey}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-              }
-              aiStatus.textContent = `Writing: ${currentKey.replace(/_/g, ' ')}…`;
-            } else if (currentKey) {
-              const chunk = payload.replace(/\\n/g, '\n');
-              currentText += chunk;
-              const ta = document.getElementById(`textarea-${currentKey}`);
-              if (ta) ta.value = currentText;
-            }
-          }
-        }
-      } catch (err) {
-        aiStatus.textContent = 'Error: ' + err.message;
-      } finally {
-        aiAllBtn.disabled = false;
-        aiAllBtn.textContent = 'AI Assist';
-      }
-    });
-  }
 </script>
 {% endblock %}

@@ -128,15 +128,45 @@ class SiteRelationship(models.Model):
         )
 
 
+class LocatorGroup(models.Model):
+    """
+    A named group of Novastar point locators not associated with a USGS site.
+    Useful for test channels, non-USGS sensors, or any collection of locators
+    that should be displayed together in the ALERT2 dashboard.
+    """
+    name                    = models.CharField(max_length=200, unique=True)
+    transmit_interval_hours = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        help_text="Scheduled ALERT2 transmit interval in hours (e.g. 1, 4, 8).",
+    )
+    transmit_offset_minutes = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="Minutes offset within each interval.",
+    )
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
 class NovaPointLocator(models.Model):
     """
-    Maps a USGS site to a Novastar ALERT/ALERT2 point locator address.
-    A single USGS site may have multiple point locators (one per sensor/parameter).
+    Maps a USGS site (or LocatorGroup) to a Novastar ALERT/ALERT2 point locator
+    address. Exactly one of `site` or `group` must be set.
     """
     site            = models.ForeignKey(
         Site,
         on_delete=models.CASCADE,
         related_name='nova_point_locators',
+        null=True, blank=True,
+    )
+    group           = models.ForeignKey(
+        LocatorGroup,
+        on_delete=models.CASCADE,
+        related_name='nova_point_locators',
+        null=True, blank=True,
     )
     point_locator   = models.CharField(
         max_length=50,
@@ -149,9 +179,10 @@ class NovaPointLocator(models.Model):
     label           = models.CharField(max_length=100, blank=True)
 
     class Meta:
-        ordering = ['site__site_no', 'parameter_type']
-        unique_together = ('site', 'point_locator')
+        ordering = ['parameter_type']
+        unique_together = [('site', 'point_locator'), ('group', 'point_locator')]
 
     def __str__(self):
+        owner = self.site.site_no if self.site else (self.group.name if self.group else '—')
         label = f" — {self.label}" if self.label else ""
-        return f"{self.site.site_no} / {self.point_locator} ({self.parameter_type}){label}"
+        return f"{owner} / {self.point_locator} ({self.parameter_type}){label}"
