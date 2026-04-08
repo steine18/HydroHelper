@@ -267,11 +267,16 @@ with transmit reliability tracking.
 - **Export Prompt** — downloads a GPT/Copilot-optimised prompt as a `.txt` file; uses
   markdown `##` headings, suppresses preamble/closing remarks, no routing markers.
   Includes full daily mean table, full instantaneous values table (station local time),
-  and comparison site discharge tables. Prior period analysis (if entered) is included
-  as a style/tone reference block.
+  comparison site discharge tables, and field measurements table (# / Date / Stage /
+  Discharge / Quality) for the analysis period.
 - **Prior Period Analysis** — optional textarea at the bottom of the report; paste the
   previous period's completed analysis here; content is auto-saved (600ms debounce) and
-  fed into the prompt export as a style reference only (not for data values).
+  included in the prompt export with two explicit instructions:
+  1. Use it as a style/narrative reference — match its tone and sentence structure but
+     do not copy its data values.
+  2. Any section whose current text is exactly `same as previous` (case-insensitive)
+     instructs the AI to copy that section verbatim from the prior period text.
+     If no prior period text is provided, those sections fall back to "generate from scratch".
 - Progress indicator shows % of sections with non-empty text
 - Note: AI Assist (Claude streaming) and Export Prompt (Claude) buttons have been removed;
   only the Copilot/GPT export is available in the UI. The `ai_assist` and `ai_assist_all`
