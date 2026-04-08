@@ -1463,10 +1463,23 @@ def _build_copilot_prompt(report):
     data_section = f"\n{observed_data}\n\n" if observed_data else ''
 
     # ---- Section instructions with markdown headings ----
+    has_prior = bool(report.prior_period_analysis.strip())
     section_instructions = []
     for s in sections:
         existing = report.section_data.get(s['key'], '').strip()
-        existing_text = existing if existing else '(empty — generate from scratch)'
+        if existing.lower() == 'same as previous':
+            if has_prior:
+                existing_text = (
+                    f'(SAME AS PREVIOUS — find the section titled "{s["title"]}" in the '
+                    f'Prior Period Analysis below and copy its text verbatim, word for word, '
+                    f'into this section. Do not paraphrase or alter it.)'
+                )
+            else:
+                existing_text = '(marked "Same as previous" but no prior period analysis was provided — generate from scratch)'
+        elif existing:
+            existing_text = existing
+        else:
+            existing_text = '(empty — generate from scratch)'
         section_instructions.append(
             f"### {s['title']}\n"
             f"**Guidance:** {s['guidance']}\n"
@@ -1490,7 +1503,14 @@ def _build_copilot_prompt(report):
     prior_block = ''
     if report.prior_period_analysis.strip():
         prior_block = (
-            f"## Prior Period Analysis (style and tone reference only — do not copy its data values)\n\n"
+            f"## Prior Period Analysis\n\n"
+            f"The text below is the completed analysis report from the previous period. "
+            f"Use it for two purposes:\n"
+            f"1. **Style and narrative reference** — match its sentence structure, tone, and level of detail "
+            f"when writing or improving sections. Do NOT copy its specific data values "
+            f"(dates, measurements, discharge figures) into the current report.\n"
+            f"2. **Verbatim source for 'Same as previous' sections** — any section marked "
+            f"'(SAME AS PREVIOUS)' in the sections below must be copied word for word from this text.\n\n"
             f"{report.prior_period_analysis.strip()}\n\n"
         )
 
