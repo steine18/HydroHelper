@@ -1389,6 +1389,17 @@ def _build_copilot_prompt(report):
                             for r in comp['iv_series']:
                                 lines.append(f"{r['datetime']} | {r['value']:>15.2f}")
 
+            # Field measurements
+            if ctx.get('measurements'):
+                lines.append("\n**Field measurements (analysis period):**")
+                lines.append(f"{'#':<12} {'Date':<12} {'Stage (ft)':>10} {'Discharge (cfs)':>16} {'Quality'}")
+                lines.append(f"{'-'*12} {'-'*12} {'-'*10} {'-'*16} {'-'*12}")
+                for m in ctx['measurements']:
+                    lines.append(
+                        f"{str(m['number']):<12} {m['date']:<12} {m['stage']:>10} "
+                        f"{m['discharge']:>16.2f} {m['quality']}"
+                    )
+
             if ctx.get('extremes_by_wy'):
                 lines.append("\n**Auto-generated Extremes (use only this text for the Extremes section — do not alter or add to it):**")
                 for wy in ctx['extremes_by_wy']:
