@@ -163,9 +163,9 @@
       <!-- Configured cross-site sources -->
       <div class="mb-3">
         <div class="fw-semibold small text-muted mb-1">Configured sources</div>
-        <table class="table table-sm table-bordered mb-0" style="font-size:0.85rem; max-width:600px;">
+        <table class="table table-sm table-bordered mb-0" style="font-size:0.85rem;">
           <thead class="table-light">
-            <tr><th>Site</th><th>Label</th><th>GH offset</th><th></th></tr>
+            <tr><th>Site</th><th>Label</th><th>GH offset</th><th>Date range</th><th></th></tr>
           </thead>
           <tbody>
             {% for cs in config.cross_site_configs %}
@@ -177,7 +177,19 @@
                        data-site-no="{{ cs.site_no }}"
                        value="{{ cs.offset_minutes }}" style="width:90px; display:inline-block;">
                 <span class="text-muted small">min</span>
-                <span class="cs-offset-status text-success small ms-1" style="display:none;">Saved</span>
+                <span class="cs-save-status text-success small ms-1" style="display:none;">Saved</span>
+              </td>
+              <td style="white-space:nowrap;">
+                <input type="date" class="form-control form-control-sm cs-date-input d-inline-block"
+                       data-site-no="{{ cs.site_no }}" data-field="date_start"
+                       value="{{ cs.date_start }}" style="width:140px;"
+                       title="Leave blank for default (6 months ago)">
+                <span class="text-muted small mx-1">to</span>
+                <input type="date" class="form-control form-control-sm cs-date-input d-inline-block"
+                       data-site-no="{{ cs.site_no }}" data-field="date_end"
+                       value="{{ cs.date_end }}" style="width:140px;"
+                       title="Leave blank for default (today)">
+                <span class="cs-date-status text-success small ms-1" style="display:none;">Saved</span>
               </td>
               <td>
                 <button class="btn btn-link btn-sm text-danger p-0 cs-remove-btn"
@@ -729,11 +741,35 @@
       offsetTimer = setTimeout(async () => {
         const siteNo = input.dataset.siteNo;
         const offset = parseInt(input.value) || 0;
-        const statusEl = input.closest('td').querySelector('.cs-offset-status');
+        const statusEl = input.closest('td').querySelector('.cs-save-status');
         const resp = await fetch(UPDATE_CROSS_SITE_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
           body: JSON.stringify({ site_no: siteNo, offset_minutes: offset }),
+        });
+        const data = await resp.json();
+        if (data.ok) {
+          statusEl.style.display = 'inline';
+          setTimeout(() => window.location.reload(), 600);
+        }
+      }, 600);
+    });
+  });
+
+  // --- Cross-site date range inline edit (debounced, reloads page to refresh measurements) ---
+  document.querySelectorAll('.cs-date-input').forEach(input => {
+    let dateTimer = null;
+    input.addEventListener('change', () => {
+      clearTimeout(dateTimer);
+      dateTimer = setTimeout(async () => {
+        const siteNo = input.dataset.siteNo;
+        const field  = input.dataset.field;
+        const value  = input.value;
+        const statusEl = input.closest('td').querySelector('.cs-date-status');
+        const resp = await fetch(UPDATE_CROSS_SITE_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+          body: JSON.stringify({ site_no: siteNo, [field]: value }),
         });
         const data = await resp.json();
         if (data.ok) {

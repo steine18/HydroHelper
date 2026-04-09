@@ -71,9 +71,10 @@ def _fetch_cross_site_points(config):
                             'points': [], 'error': str(exc)})
             continue
 
-        # Default to the most recent 6 months only
-        cutoff = (date.today() - timedelta(days=183)).strftime('%Y-%m-%d')
-        raw_meas = [m for m in raw_meas if m.get('date', '') >= cutoff]
+        # Apply configurable date range; default to last 6 months / today
+        date_start = cfg.get('date_start') or (date.today() - timedelta(days=183)).strftime('%Y-%m-%d')
+        date_end   = cfg.get('date_end')   or date.today().strftime('%Y-%m-%d')
+        raw_meas = [m for m in raw_meas if date_start <= m.get('date', '') <= date_end]
 
         # Filter to measurements that have a full timestamp (len > 10 means more than just date)
         timed = []
@@ -135,6 +136,8 @@ def _fetch_cross_site_points(config):
             'site_no':        site_no,
             'label':          label,
             'offset_minutes': offset_minutes,
+            'date_start':     cfg.get('date_start', ''),
+            'date_end':       cfg.get('date_end', ''),
             'hidden_nos':     list(cfg.get('hidden_nos', [])),
             'points':         points,
             'error':          None,
@@ -448,20 +451,30 @@ def remove_cross_site(request, pk):
 @login_required
 @require_POST
 def update_cross_site(request, pk):
-    """Update the offset_minutes for an existing cross-site config entry."""
+    """Update editable fields (offset_minutes, date_start, date_end) for a cross-site config entry."""
     config = get_object_or_404(RatingConfig, pk=pk, user=request.user)
     try:
-        body           = json.loads(request.body)
-        site_no        = body.get('site_no', '').strip()
-        offset_minutes = int(body.get('offset_minutes', 0))
-    except (json.JSONDecodeError, ValueError, AttributeError):
+        body    = json.loads(request.body)
+        site_no = body.get('site_no', '').strip()
+    except (json.JSONDecodeError, AttributeError):
         return JsonResponse({'ok': False, 'error': 'Invalid data'}, status=400)
+
+    updates = {}
+    if 'offset_minutes' in body:
+        try:
+            updates['offset_minutes'] = int(body['offset_minutes'])
+        except (ValueError, TypeError):
+            return JsonResponse({'ok': False, 'error': 'Invalid offset.'}, status=400)
+    for field in ('date_start', 'date_end'):
+        if field in body:
+            val = body[field]
+            updates[field] = val.strip() if val else ''
 
     updated = []
     found = False
     for c in config.cross_site_configs:
         if c['site_no'] == site_no:
-            updated.append({**c, 'offset_minutes': offset_minutes})
+            updated.append({**c, **updates})
             found = True
         else:
             updated.append(c)
