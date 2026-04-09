@@ -132,6 +132,103 @@
     </div>
   </div>
 
+  <!-- Cross-site measurements card -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header py-2 d-flex justify-content-between align-items-center">
+      <h6 class="mb-0 fw-bold">Cross-Site Transferred Measurements</h6>
+      <span class="text-muted small">Discharge from a secondary site paired with primary site GH at measurement time + offset</span>
+    </div>
+    <div class="card-body">
+
+      <!-- Add form -->
+      <div class="d-flex align-items-end gap-2 mb-3 flex-wrap">
+        <div>
+          <label class="form-label small mb-1 fw-semibold">Secondary site #</label>
+          <input type="text" id="cs-site-no" class="form-control form-control-sm" style="width:130px;" placeholder="e.g. 09419700">
+        </div>
+        <div>
+          <label class="form-label small mb-1 fw-semibold">GH offset (min)</label>
+          <input type="number" id="cs-offset" class="form-control form-control-sm" style="width:100px;" value="0"
+                 title="Minutes to add to measurement time when looking up primary site GH. Positive = look forward; negative = look backward.">
+        </div>
+        <div>
+          <label class="form-label small mb-1 fw-semibold">Label (optional)</label>
+          <input type="text" id="cs-label" class="form-control form-control-sm" style="width:200px;" placeholder="auto">
+        </div>
+        <button class="btn btn-sm btn-primary mb-0" id="cs-add-btn" style="align-self:flex-end;">Add</button>
+        <span class="text-danger small" id="cs-add-error"></span>
+      </div>
+
+      {% if config.cross_site_configs %}
+      <!-- Configured cross-site sources -->
+      <div class="mb-3">
+        <div class="fw-semibold small text-muted mb-1">Configured sources</div>
+        <table class="table table-sm table-bordered mb-0" style="font-size:0.85rem; max-width:600px;">
+          <thead class="table-light">
+            <tr><th>Site</th><th>Label</th><th>GH offset</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for cs in config.cross_site_configs %}
+            <tr>
+              <td>{{ cs.site_no }}</td>
+              <td>{{ cs.label }}</td>
+              <td>{% if cs.offset_minutes >= 0 %}+{% endif %}{{ cs.offset_minutes }} min</td>
+              <td>
+                <button class="btn btn-link btn-sm text-danger p-0 cs-remove-btn"
+                        data-site-no="{{ cs.site_no }}" style="font-size:0.8rem;">Remove</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Transferred point tables, one per source -->
+      {% for cs in cross_site_data %}
+      <div class="mb-3">
+        <div class="fw-semibold small mb-1">
+          {{ cs.label }}
+          <span class="text-muted fw-normal">(Q from {{ cs.site_no }}, GH from primary site at time {% if cs.offset_minutes >= 0 %}+{% endif %}{{ cs.offset_minutes }} min)</span>
+        </div>
+        {% if cs.error %}
+        <div class="alert alert-warning py-1 px-2 small">{{ cs.error }}</div>
+        {% elif cs.points %}
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0" style="font-size:0.85rem; max-width:600px;">
+            <thead class="table-light">
+              <tr>
+                <th>#</th><th>Date</th>
+                <th>Q (cfs) <span class="text-muted fw-normal small">({{ cs.site_no }})</span></th>
+                <th>GH (ft) <span class="text-muted fw-normal small">(primary, offset)</span></th>
+                <th>Quality</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in cs.points %}
+              <tr>
+                <td>{{ p.number }}</td>
+                <td>{{ p.date }}</td>
+                <td>{{ p.discharge }}</td>
+                <td>{{ p.gh }}</td>
+                <td>{{ p.quality }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-muted small">No transferred points produced (check that measurement timestamps are available).</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+      {% else %}
+      <div class="text-muted small">No cross-site sources configured yet. Add one above.</div>
+      {% endif %}
+
+    </div>
+  </div>
+
   <!-- Measurements table -->
   <div class="card shadow-sm mb-4">
     <div class="card-header d-flex justify-content-between align-items-center py-2">
@@ -215,6 +312,8 @@
   const CSRF_TOKEN = '{{ csrf_token }}';
   const TOGGLE_URL = "{% url 'rating_toggle_measurement' config.pk %}";
   const UPDATE_URL = "{% url 'rating_update' config.pk %}";
+  const ADD_CROSS_SITE_URL    = "{% url 'rating_add_cross_site' config.pk %}";
+  const REMOVE_CROSS_SITE_URL = "{% url 'rating_remove_cross_site' config.pk %}";
   const QUALITY_ORDER = {{ quality_order_json|safe }};
   const QUALITY_COLORS = {{ quality_colors_json|safe }};
   // Trace indices: 0 = rating curve line, 1 = control points, 2..N = quality groups
@@ -474,6 +573,40 @@
 
   document.querySelectorAll('#meas-table thead th.sortable').forEach(th => {
     th.addEventListener('click', () => sortTable(th));
+  });
+
+  // --- Cross-site measurement add/remove ---
+  document.getElementById('cs-add-btn')?.addEventListener('click', async () => {
+    const siteNo = document.getElementById('cs-site-no').value.trim();
+    const offset = parseInt(document.getElementById('cs-offset').value) || 0;
+    const label  = document.getElementById('cs-label').value.trim();
+    const errEl  = document.getElementById('cs-add-error');
+    errEl.textContent = '';
+    if (!siteNo) { errEl.textContent = 'Site number required.'; return; }
+    const resp = await fetch(ADD_CROSS_SITE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+      body: JSON.stringify({ site_no: siteNo, offset_minutes: offset, label }),
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      window.location.reload();
+    } else {
+      errEl.textContent = data.error || 'Error adding site.';
+    }
+  });
+
+  document.querySelectorAll('.cs-remove-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const siteNo = btn.dataset.siteNo;
+      const resp = await fetch(REMOVE_CROSS_SITE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({ site_no: siteNo }),
+      });
+      const data = await resp.json();
+      if (data.ok) window.location.reload();
+    });
   });
 </script>
 {% endblock %}

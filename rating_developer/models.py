@@ -17,6 +17,10 @@ class RatingConfig(models.Model):
     use_manual_rating = models.BooleanField(default=False)
     manual_rating_text = models.TextField(blank=True)
     hidden_measurement_nos = models.JSONField(default=list)
+    cross_site_configs = models.JSONField(
+        default=list,
+        help_text='List of {site_no, offset_minutes, label} dicts for cross-site measurement transfer.',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

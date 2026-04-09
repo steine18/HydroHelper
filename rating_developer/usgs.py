@@ -153,6 +153,7 @@ def fetch_measurements(site_no: str) -> list[dict]:
         rows.append({
             'number': meas_no_by_visit.get(visit_id, visit_id[:8]),
             'date': date_str,
+            'time': q_data['time'],  # full ISO datetime string (may be empty)
             'stage': stage,
             'discharge': q_data['discharge'],
             'quality': q_data['quality'],
