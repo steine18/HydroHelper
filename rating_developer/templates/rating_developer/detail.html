@@ -200,9 +200,13 @@
         <div class="alert alert-warning py-1 px-2 small">{{ cs.error }}</div>
         {% elif cs.points %}
         <div class="table-responsive">
-          <table class="table table-sm table-hover mb-0" style="font-size:0.85rem; max-width:600px;">
+          <table class="table table-sm table-hover mb-0" style="font-size:0.85rem; max-width:650px;">
             <thead class="table-light">
               <tr>
+                <th style="width:36px;">
+                  <input type="checkbox" class="form-check-input cs-toggle-all"
+                         data-cs-site-no="{{ cs.site_no }}" checked title="Check/uncheck all">
+                </th>
                 <th>#</th><th>Date</th>
                 <th>Q (cfs) <span class="text-muted fw-normal small">({{ cs.site_no }})</span></th>
                 <th>GH (ft) <span class="text-muted fw-normal small">(primary, offset)</span></th>
@@ -212,6 +216,11 @@
             <tbody>
               {% for p in cs.points %}
               <tr>
+                <td>
+                  <input type="checkbox" class="form-check-input cs-meas-toggle"
+                         data-cs-site-no="{{ cs.site_no }}" data-meas-no="{{ p.number }}"
+                         {% if not p.hidden %}checked{% endif %}>
+                </td>
                 <td>{{ p.number }}</td>
                 <td>{{ p.date }}</td>
                 <td>{{ p.discharge }}</td>
@@ -320,7 +329,42 @@
   const UPDATE_URL = "{% url 'rating_update' config.pk %}";
   const ADD_CROSS_SITE_URL    = "{% url 'rating_add_cross_site' config.pk %}";
   const REMOVE_CROSS_SITE_URL = "{% url 'rating_remove_cross_site' config.pk %}";
-  const UPDATE_CROSS_SITE_URL = "{% url 'rating_update_cross_site' config.pk %}";
+  const UPDATE_CROSS_SITE_URL       = "{% url 'rating_update_cross_site' config.pk %}";
+  const TOGGLE_CROSS_SITE_URL       = "{% url 'rating_toggle_cross_site' config.pk %}";
+  const CS_QUALITY_ORDER            = {{ quality_order_json|safe }};
+  // Cross-site trace indices start at 2 + len(QUALITY_ORDER) = 7
+  const CS_TRACE_START              = 2 + CS_QUALITY_ORDER.length;
+  const allCrossSiteData            = {{ cross_site_data_json|safe }};
+
+  // Build per-config map: site_no → {points (all), hiddenSet, traceIdx}
+  const csMap = {};
+  allCrossSiteData.forEach((cs, i) => {
+    csMap[cs.site_no] = {
+      points:    cs.points || [],
+      hiddenSet: new Set((cs.hidden_nos || []).map(String)),
+      traceIdx:  CS_TRACE_START + i,
+      label:     cs.label,
+      offsetMin: cs.offset_minutes,
+    };
+  });
+
+  function rebuildCrossSiteTrace(siteNo) {
+    if (!chartDiv) return;
+    const cs = csMap[siteNo];
+    if (!cs) return;
+    const visible = cs.points.filter(p => !cs.hiddenSet.has(String(p.number)));
+    const offsetLabel = cs.offsetMin >= 0 ? `+${cs.offsetMin} min` : `${cs.offsetMin} min`;
+    Plotly.restyle(chartDiv, {
+      x:    [visible.map(p => p.discharge)],
+      y:    [visible.map(p => p.gh)],
+      text: [visible.map(p =>
+        `#${p.number} — ${p.date}<br>` +
+        `Q: ${p.discharge} cfs (at ${siteNo})<br>` +
+        `GH: ${p.gh} ft (primary, ${offsetLabel})<br>` +
+        p.quality
+      )],
+    }, [cs.traceIdx]);
+  }
   const QUALITY_ORDER = {{ quality_order_json|safe }};
   const QUALITY_COLORS = {{ quality_colors_json|safe }};
   // Trace indices: 0 = rating curve line, 1 = control points, 2..N = quality groups
@@ -615,6 +659,67 @@
       if (data.ok) window.location.reload();
     });
   });
+
+  // --- Cross-site offset inline edit (debounced, reloads page to refresh chart) ---
+  // --- Cross-site individual measurement toggles ---
+  document.querySelectorAll('.cs-meas-toggle').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const siteNo = cb.dataset.csSiteNo;
+      const measNo = String(cb.dataset.measNo);
+      const hide   = !cb.checked;
+      const cs     = csMap[siteNo];
+      if (cs) {
+        if (hide) cs.hiddenSet.add(measNo);
+        else      cs.hiddenSet.delete(measNo);
+        rebuildCrossSiteTrace(siteNo);
+        // Update header checkbox state
+        updateCsToggleAll(siteNo);
+      }
+      fetch(TOGGLE_CROSS_SITE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({ site_no: siteNo, measurement_no: measNo, hidden: hide }),
+      });
+    });
+  });
+
+  function updateCsToggleAll(siteNo) {
+    const headerCb = document.querySelector(`.cs-toggle-all[data-cs-site-no="${siteNo}"]`);
+    if (!headerCb) return;
+    const allCbs = Array.from(document.querySelectorAll(`.cs-meas-toggle[data-cs-site-no="${siteNo}"]`));
+    const allChecked = allCbs.every(c => c.checked);
+    const anyChecked = allCbs.some(c => c.checked);
+    headerCb.checked       = allChecked;
+    headerCb.indeterminate = !allChecked && anyChecked;
+  }
+
+  // --- Cross-site check/uncheck all ---
+  document.querySelectorAll('.cs-toggle-all').forEach(headerCb => {
+    headerCb.addEventListener('change', () => {
+      const siteNo  = headerCb.dataset.csSiteNo;
+      const checked = headerCb.checked;
+      document.querySelectorAll(`.cs-meas-toggle[data-cs-site-no="${siteNo}"]`).forEach(cb => {
+        if (cb.checked === checked) return;
+        cb.checked = checked;
+        const measNo = String(cb.dataset.measNo);
+        const cs     = csMap[siteNo];
+        if (cs) {
+          if (!checked) cs.hiddenSet.add(measNo);
+          else          cs.hiddenSet.delete(measNo);
+        }
+        fetch(TOGGLE_CROSS_SITE_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+          body: JSON.stringify({ site_no: siteNo, measurement_no: measNo, hidden: !checked }),
+        });
+      });
+      const cs = csMap[siteNo];
+      if (cs) rebuildCrossSiteTrace(siteNo);
+    });
+  });
+
+  // Initialise header checkbox indeterminate state on load
+  allCrossSiteData.forEach(cs => updateCsToggleAll(cs.site_no));
 
   // --- Cross-site offset inline edit (debounced, reloads page to refresh chart) ---
   document.querySelectorAll('.cs-offset-input').forEach(input => {

@@ -113,24 +113,29 @@ def _fetch_cross_site_points(config):
 
         iv_records = df_gh_clean.sort('datetime').to_dicts()
 
+        hidden_set_local = set(str(n) for n in cfg.get('hidden_nos', []))
+
         points = []
         for m, meas_dt in timed:
             target_dt = meas_dt + offset_td
             gh = _interpolate_gh(iv_records, target_dt)
             if gh is None:
                 continue
+            meas_no_str = str(m['number'])
             points.append({
                 'number':    m['number'],
                 'date':      m['date'],
                 'discharge': m['discharge'],
                 'gh':        round(gh, 2),
                 'quality':   m['quality'],
+                'hidden':    meas_no_str in hidden_set_local,
             })
 
         results.append({
             'site_no':        site_no,
             'label':          label,
             'offset_minutes': offset_minutes,
+            'hidden_nos':     list(cfg.get('hidden_nos', [])),
             'points':         points,
             'error':          None,
         })
@@ -189,7 +194,7 @@ def _build_rating_chart(rating_curve, rating_points, measurements, hidden_nos, c
     # Traces 7+: cross-site transferred measurement points (triangle-up markers)
     for i, cs in enumerate(cross_site_data or []):
         color = _CROSS_SITE_COLORS[i % len(_CROSS_SITE_COLORS)]
-        pts = cs.get('points', [])
+        pts = [p for p in cs.get('points', []) if not p.get('hidden')]
         offset_label = (
             f"+{cs['offset_minutes']} min" if cs['offset_minutes'] >= 0
             else f"{cs['offset_minutes']} min"
@@ -333,6 +338,7 @@ def detail(request, pk):
         'quality_colors_json': json.dumps(QUALITY_COLORS),
         'quality_order_json': json.dumps(QUALITY_ORDER),
         'cross_site_data': cross_site_data,
+        'cross_site_data_json': json.dumps(cross_site_data),
         'rating_error': rating_error,
         'meas_error': meas_error,
         'filter_start': filter_start,
@@ -417,6 +423,7 @@ def add_cross_site(request, pk):
         'site_no':        site.site_no,
         'offset_minutes': offset_minutes,
         'label':          label or f"{site.site_no} — {site.name}",
+        'hidden_nos':     [],
     }
     config.cross_site_configs = list(config.cross_site_configs) + [entry]
     config.save(update_fields=['cross_site_configs', 'updated_at'])
@@ -461,6 +468,36 @@ def update_cross_site(request, pk):
 
     if not found:
         return JsonResponse({'ok': False, 'error': 'Site not found in config.'}, status=404)
+
+    config.cross_site_configs = updated
+    config.save(update_fields=['cross_site_configs', 'updated_at'])
+    return JsonResponse({'ok': True})
+
+
+@login_required
+@require_POST
+def toggle_cross_site_measurement(request, pk):
+    """Show/hide an individual transferred measurement point on the chart."""
+    config = get_object_or_404(RatingConfig, pk=pk, user=request.user)
+    try:
+        body    = json.loads(request.body)
+        site_no = body.get('site_no', '').strip()
+        meas_no = str(body.get('measurement_no', ''))
+        hide    = bool(body.get('hidden', False))
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({'ok': False, 'error': 'Invalid data'}, status=400)
+
+    updated = []
+    for c in config.cross_site_configs:
+        if c['site_no'] == site_no:
+            hidden = [str(n) for n in c.get('hidden_nos', [])]
+            if hide and meas_no not in hidden:
+                hidden.append(meas_no)
+            elif not hide and meas_no in hidden:
+                hidden.remove(meas_no)
+            updated.append({**c, 'hidden_nos': hidden})
+        else:
+            updated.append(c)
 
     config.cross_site_configs = updated
     config.save(update_fields=['cross_site_configs', 'updated_at'])
