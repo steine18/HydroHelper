@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import plotly.graph_objects as go
 import plotly.io as pio
@@ -70,6 +70,10 @@ def _fetch_cross_site_points(config):
             results.append({'site_no': site_no, 'label': label, 'offset_minutes': offset_minutes,
                             'points': [], 'error': str(exc)})
             continue
+
+        # Default to the most recent 6 months only
+        cutoff = (date.today() - timedelta(days=183)).strftime('%Y-%m-%d')
+        raw_meas = [m for m in raw_meas if m.get('date', '') >= cutoff]
 
         # Filter to measurements that have a full timestamp (len > 10 means more than just date)
         timed = []
