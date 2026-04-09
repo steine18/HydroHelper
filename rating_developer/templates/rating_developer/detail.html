@@ -172,7 +172,13 @@
             <tr>
               <td>{{ cs.site_no }}</td>
               <td>{{ cs.label }}</td>
-              <td>{% if cs.offset_minutes >= 0 %}+{% endif %}{{ cs.offset_minutes }} min</td>
+              <td style="white-space:nowrap;">
+                <input type="number" class="form-control form-control-sm cs-offset-input"
+                       data-site-no="{{ cs.site_no }}"
+                       value="{{ cs.offset_minutes }}" style="width:90px; display:inline-block;">
+                <span class="text-muted small">min</span>
+                <span class="cs-offset-status text-success small ms-1" style="display:none;">Saved</span>
+              </td>
               <td>
                 <button class="btn btn-link btn-sm text-danger p-0 cs-remove-btn"
                         data-site-no="{{ cs.site_no }}" style="font-size:0.8rem;">Remove</button>
@@ -314,6 +320,7 @@
   const UPDATE_URL = "{% url 'rating_update' config.pk %}";
   const ADD_CROSS_SITE_URL    = "{% url 'rating_add_cross_site' config.pk %}";
   const REMOVE_CROSS_SITE_URL = "{% url 'rating_remove_cross_site' config.pk %}";
+  const UPDATE_CROSS_SITE_URL = "{% url 'rating_update_cross_site' config.pk %}";
   const QUALITY_ORDER = {{ quality_order_json|safe }};
   const QUALITY_COLORS = {{ quality_colors_json|safe }};
   // Trace indices: 0 = rating curve line, 1 = control points, 2..N = quality groups
@@ -606,6 +613,29 @@
       });
       const data = await resp.json();
       if (data.ok) window.location.reload();
+    });
+  });
+
+  // --- Cross-site offset inline edit (debounced, reloads page to refresh chart) ---
+  document.querySelectorAll('.cs-offset-input').forEach(input => {
+    let offsetTimer = null;
+    input.addEventListener('change', () => {
+      clearTimeout(offsetTimer);
+      offsetTimer = setTimeout(async () => {
+        const siteNo = input.dataset.siteNo;
+        const offset = parseInt(input.value) || 0;
+        const statusEl = input.closest('td').querySelector('.cs-offset-status');
+        const resp = await fetch(UPDATE_CROSS_SITE_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+          body: JSON.stringify({ site_no: siteNo, offset_minutes: offset }),
+        });
+        const data = await resp.json();
+        if (data.ok) {
+          statusEl.style.display = 'inline';
+          setTimeout(() => window.location.reload(), 600);
+        }
+      }, 600);
     });
   });
 </script>

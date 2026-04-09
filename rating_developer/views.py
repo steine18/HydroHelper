@@ -211,8 +211,8 @@ def _build_rating_chart(rating_curve, rating_points, measurements, hidden_nos, c
         ))
 
     fig.update_layout(
-        margin=dict(l=60, r=20, t=30, b=60),
-        height=500,
+        margin=dict(l=60, r=20, t=30, b=120),
+        height=540,
         xaxis=dict(
             title='Discharge (cfs)',
             type='log',
@@ -224,7 +224,12 @@ def _build_rating_chart(rating_curve, rating_points, measurements, hidden_nos, c
         plot_bgcolor='white',
         paper_bgcolor='white',
         hovermode='closest',
-        legend=dict(x=1.02, xanchor='left', y=1, yanchor='top'),
+        legend=dict(
+            orientation='h',
+            yanchor='top', y=-0.18,
+            xanchor='center', x=0.5,
+            font=dict(size=11),
+        ),
     )
 
     return pio.to_html(
@@ -429,5 +434,34 @@ def remove_cross_site(request, pk):
         return JsonResponse({'ok': False, 'error': 'Invalid data'}, status=400)
 
     config.cross_site_configs = [c for c in config.cross_site_configs if c['site_no'] != site_no]
+    config.save(update_fields=['cross_site_configs', 'updated_at'])
+    return JsonResponse({'ok': True})
+
+
+@login_required
+@require_POST
+def update_cross_site(request, pk):
+    """Update the offset_minutes for an existing cross-site config entry."""
+    config = get_object_or_404(RatingConfig, pk=pk, user=request.user)
+    try:
+        body           = json.loads(request.body)
+        site_no        = body.get('site_no', '').strip()
+        offset_minutes = int(body.get('offset_minutes', 0))
+    except (json.JSONDecodeError, ValueError, AttributeError):
+        return JsonResponse({'ok': False, 'error': 'Invalid data'}, status=400)
+
+    updated = []
+    found = False
+    for c in config.cross_site_configs:
+        if c['site_no'] == site_no:
+            updated.append({**c, 'offset_minutes': offset_minutes})
+            found = True
+        else:
+            updated.append(c)
+
+    if not found:
+        return JsonResponse({'ok': False, 'error': 'Site not found in config.'}, status=404)
+
+    config.cross_site_configs = updated
     config.save(update_fields=['cross_site_configs', 'updated_at'])
     return JsonResponse({'ok': True})

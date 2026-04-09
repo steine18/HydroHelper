@@ -9,4 +9,5 @@ urlpatterns = [
     path('<int:pk>/toggle_measurement/', views.toggle_measurement, name='rating_toggle_measurement'),
     path('<int:pk>/cross-site/add/', views.add_cross_site, name='rating_add_cross_site'),
     path('<int:pk>/cross-site/remove/', views.remove_cross_site, name='rating_remove_cross_site'),
+    path('<int:pk>/cross-site/update/', views.update_cross_site, name='rating_update_cross_site'),
 ]
