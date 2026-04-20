@@ -291,9 +291,17 @@ async function save() {
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
       body: JSON.stringify(collectData()),
     });
-    if (saveStatus) saveStatus.textContent = resp.ok ? 'Saved' : 'Error saving';
+    let ok = false;
+    try {
+      const data = await resp.json();
+      ok = data.ok === true;
+    } catch {
+      // Non-JSON response (e.g. session expired, redirected to login page) — treat as failure
+      ok = false;
+    }
+    if (saveStatus) saveStatus.textContent = ok ? 'Saved' : 'Error saving — please reload';
   } catch {
-    if (saveStatus) saveStatus.textContent = 'Error saving';
+    if (saveStatus) saveStatus.textContent = 'Error saving — please reload';
   }
 }
 function scheduleSave() {

@@ -1,5 +1,6 @@
 import io
 import json
+import logging
 
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
@@ -14,6 +15,8 @@ from water_balance.usgs import USGSAPIError
 from .approval_types import APPROVAL_TYPES_BY_ID
 from .forms import NewApprovalForm
 from .models import ApprovalRequest
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
@@ -70,7 +73,11 @@ def autosave(request, pk):
     except (json.JSONDecodeError, AttributeError):
         return JsonResponse({'ok': False}, status=400)
     approval.response_data = data
-    approval.save(update_fields=['response_data', 'updated_at'])
+    try:
+        approval.save(update_fields=['response_data', 'updated_at'])
+    except Exception:
+        logger.exception('autosave failed for ApprovalRequest pk=%s', pk)
+        return JsonResponse({'ok': False}, status=500)
     return JsonResponse({'ok': True})
 
 
