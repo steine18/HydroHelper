@@ -63,6 +63,8 @@
              data-number="{{ item.number }}"
              data-text="{{ item.text }}"
              data-answer="{{ r.answer }}"
+             data-ans-label="{{ r.ans_label }}"
+             data-ans-class="{{ r.ans_class }}"
              data-comment="{{ r.comment }}">
           <div class="d-flex align-items-start gap-3">
             <span class="text-muted small fw-semibold mt-1" style="white-space:nowrap;">{{ item.number }}</span>
@@ -109,7 +111,8 @@
         <div class="mb-3 ps-2 report-question"
              data-number="{{ item.number }}"
              data-text="{{ item.text }}"
-             data-body="{{ r.text }}">
+             data-body="{{ r.text }}"
+             data-color="{{ r.color|default:'' }}">
           <div class="d-flex align-items-start gap-3">
             <span class="text-muted small fw-semibold mt-1" style="white-space:nowrap;">{{ item.number }}</span>
             <div class="flex-grow-1">
@@ -134,48 +137,87 @@
 
 {% block extra_script %}
 <script>
-document.getElementById('copy-btn').addEventListener('click', function () {
-  const lines = [];
+document.getElementById('copy-btn').addEventListener('click', async function () {
+  const ansClassColors = {
+    'answer-yes':    '#198754',
+    'answer-no':     '#dc3545',
+    'answer-na':     '#6c757d',
+    'answer-orange': '#fd7e14',
+    'answer-blank':  '#adb5bd',
+  };
+  const textBlockColors = { green: '#198754', orange: '#fd7e14', red: '#dc3545' };
 
-  lines.push("{{ approval.site.site_no }} — {{ approval.site.name|escapejs }}");
-  lines.push("{{ approval.get_approval_type_display }} Approval — {{ approval.period_start }} to {{ approval.period_end }}");
+  function colorSpan(text, color, italic) {
+    const style = `color:${color};font-weight:600;${italic ? 'font-style:italic;' : ''}`;
+    return `<span style="${style}">${text}</span>`;
+  }
+
+  const header1 = "{{ approval.site.site_no }} \u2014 {{ approval.site.name|escapejs }}";
+  const header2 = "{{ approval.get_approval_type_display }} Approval \u2014 {{ approval.period_start }} to {{ approval.period_end }}";
+
+  const textLines = [header1, header2];
+  const htmlParts = [`<p><strong>${header1}</strong><br>${header2}</p>`];
 
   document.querySelectorAll('.report-section, .report-question').forEach(el => {
     if (el.classList.contains('report-section')) {
-      lines.push('');
       const title = el.dataset.title;
-      lines.push(title);
-      lines.push('-'.repeat(title.length));
-    } else {
-      const num = el.dataset.number;
-      const text = el.dataset.text;
+      textLines.push('', title);
+      htmlParts.push(`<p><strong>${title}</strong></p>`);
+      return;
+    }
 
-      if ('body' in el.dataset) {
-        // text type
-        lines.push('');
-        lines.push(`${num}. ${text}`);
-        lines.push(el.dataset.body.trim() || '(not answered)');
-      } else if ('date' in el.dataset) {
-        // date type
-        const date = el.dataset.date || '(not answered)';
-        const comment = el.dataset.comment;
-        lines.push(`${num}. ${text} ${date}${comment ? ' — ' + comment : ''}`);
-      } else {
-        // yn type
-        const answerMap = {yes: 'Yes', no: 'No', na: 'N/A', '': '(not answered)'};
-        const answer = answerMap[el.dataset.answer] || '(not answered)';
-        const comment = el.dataset.comment;
-        lines.push(`${num}. ${text}`);
-        lines.push(`    ${answer}${comment ? ': ' + comment : ''}`);
-      }
+    const num  = el.dataset.number;
+    const text = el.dataset.text;
+
+    if ('body' in el.dataset) {
+      // text type
+      const body  = el.dataset.body.trim() || '(not answered)';
+      const color = textBlockColors[el.dataset.color] || '';
+      textLines.push('', `${num}. ${text}`, body);
+      const bodyHtml = color
+        ? colorSpan(body.replace(/\n/g, '<br>'), color, false)
+        : body.replace(/\n/g, '<br>');
+      htmlParts.push(`<p>${num}. ${text}<br>${bodyHtml}</p>`);
+
+    } else if ('date' in el.dataset) {
+      // date type
+      const date    = el.dataset.date || '(not answered)';
+      const comment = el.dataset.comment;
+      const full    = date + (comment ? ' \u2014 ' + comment : '');
+      textLines.push(`${num}. ${text}`, full);
+      htmlParts.push(`<p>${num}. ${text}<br>${full}</p>`);
+
+    } else {
+      // yn type
+      const ansLabel = el.dataset.ansLabel || '(not answered)';
+      const ansClass = el.dataset.ansClass || '';
+      const comment  = el.dataset.comment;
+      const ansText  = ansLabel + (comment ? ': ' + comment : '');
+      textLines.push(`${num}. ${text}`, ansText);
+      const color    = ansClassColors[ansClass] || '';
+      const italic   = ansClass === 'answer-blank';
+      const ansHtml  = color ? colorSpan(ansText, color, italic) : ansText;
+      htmlParts.push(`<p>${num}. ${text}<br>${ansHtml}</p>`);
     }
   });
 
-  navigator.clipboard.writeText(lines.join('\n')).then(() => {
-    const btn = document.getElementById('copy-btn');
-    btn.textContent = 'Copied!';
-    setTimeout(() => btn.textContent = 'Copy Text', 2000);
-  });
+  const plainText = textLines.join('\n');
+  const htmlText  = `<html><body style="font-family:sans-serif;">${htmlParts.join('')}</body></html>`;
+
+  try {
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        'text/html':  new Blob([htmlText],  { type: 'text/html'  }),
+        'text/plain': new Blob([plainText], { type: 'text/plain' }),
+      })
+    ]);
+  } catch {
+    await navigator.clipboard.writeText(plainText);
+  }
+
+  const btn = document.getElementById('copy-btn');
+  btn.textContent = 'Copied!';
+  setTimeout(() => btn.textContent = 'Copy Text', 2000);
 });
 </script>
 {% endblock %}
