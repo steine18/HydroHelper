@@ -177,12 +177,6 @@ const CSRF_TOKEN = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
 const AUTOSAVE_URL = "{% url 'approval_autosave' approval.pk %}";
 const INITIAL_DATA = JSON.parse('{{ response_json|escapejs }}');
 
-// Question list for live progress computation (mirrors completion_pct() in Python)
-const QUESTIONS = [
-  {% for item in items %}{% if item.type == 'yn' or item.type == 'date' or item.type == 'text' %}
-  { key: "{{ item.key }}", type: "{{ item.type }}" },
-  {% endif %}{% endfor %}
-];
 
 // Pre-populate form from saved data
 function populateForm() {
@@ -262,18 +256,22 @@ function collectData() {
   return data;
 }
 
-// Live progress bar
+// Live progress bar — only counts questions that are currently visible
 function updateProgress() {
-  if (!QUESTIONS.length) return;
   const data = collectData();
+  let total = 0;
   let answered = 0;
-  for (const q of QUESTIONS) {
-    const r = data[q.key] || {};
-    if (q.type === 'yn' && r.answer) answered++;
-    else if (q.type === 'date' && r.date) answered++;
-    else if (q.type === 'text' && r.text && r.text.trim()) answered++;
-  }
-  const pct = Math.round(answered / QUESTIONS.length * 100);
+  document.querySelectorAll('.question-block').forEach(block => {
+    if (block.style.display === 'none') return;
+    total++;
+    const key = block.dataset.key;
+    const type = block.dataset.type;
+    const r = data[key] || {};
+    if (type === 'yn' && r.answer) answered++;
+    else if (type === 'date' && r.date) answered++;
+    else if (type === 'text' && r.text && r.text.trim()) answered++;
+  });
+  const pct = total ? Math.round(answered / total * 100) : 0;
   const bar = document.getElementById('completion-bar');
   const label = document.getElementById('completion-label');
   if (bar) bar.style.width = pct + '%';

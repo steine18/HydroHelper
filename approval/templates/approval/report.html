@@ -88,6 +88,7 @@
              data-number="{{ item.number }}"
              data-text="{{ item.text }}"
              data-date="{{ r.date }}"
+             data-date-ans-class="{{ r.date_ans_class|default:'' }}"
              data-comment="{{ r.comment }}">
           <div class="d-flex align-items-start gap-3">
             <span class="text-muted small fw-semibold mt-1" style="white-space:nowrap;">{{ item.number }}</span>
@@ -95,7 +96,7 @@
               <div class="small mb-1">{{ item.text }}</div>
               <div class="small">
                 {% if r.date %}
-                  <span class="fw-semibold">{{ r.date }}</span>
+                  <span class="fw-semibold {% if r.date_ans_class %}{{ r.date_ans_class }}{% endif %}">{{ r.date }}</span>
                   {% if r.comment %} &mdash; <span class="text-muted">{{ r.comment }}</span>{% endif %}
                 {% else %}
                   <span class="answer-blank">— not answered{% if r.comment %}, <span class="text-muted">{{ r.comment }}</span>{% endif %}</span>
@@ -181,11 +182,15 @@ document.getElementById('copy-btn').addEventListener('click', async function () 
 
     } else if ('date' in el.dataset) {
       // date type
-      const date    = el.dataset.date || '(not answered)';
-      const comment = el.dataset.comment;
-      const full    = date + (comment ? ' \u2014 ' + comment : '');
+      const date         = el.dataset.date || '(not answered)';
+      const comment      = el.dataset.comment;
+      const dateAnsClass = el.dataset.dateAnsClass || '';
+      const full         = date + (comment ? ' \u2014 ' + comment : '');
       textLines.push(`${num}. ${text}`, full);
-      htmlParts.push(`<p>${num}. ${text}<br>${full}</p>`);
+      const dateColor  = ansClassColors[dateAnsClass] || '';
+      const dateHtml   = dateColor ? colorSpan(date, dateColor, false) : date;
+      const fullHtml   = dateHtml + (comment ? ' \u2014 ' + comment : '');
+      htmlParts.push(`<p>${num}. ${text}<br>${fullHtml}</p>`);
 
     } else {
       // yn type

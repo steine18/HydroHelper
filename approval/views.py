@@ -133,6 +133,23 @@ def approval_report(request, pk):
             parent_answer = response_data.get(cond_on, {}).get('answer', '')
             visible[key] = parent_visible and (parent_answer == cond_val)
 
+    # Pre-compute ans_class for all visible yn items (needed to colour date fields)
+    yn_ans_classes = {}
+    for item in items:
+        if item['type'] != 'yn':
+            continue
+        key = item['key']
+        if not visible.get(key, True):
+            continue
+        resp = response_data.get(key, {})
+        answer = resp.get('answer', '')
+        ans_class = 'answer-blank'
+        for opt in item.get('options', []):
+            if opt['value'] == answer:
+                ans_class = 'answer-na' if opt['value'] == 'na' else ('answer-yes' if opt['good'] else 'answer-no')
+                break
+        yn_ans_classes[key] = ans_class
+
     # Build report rows, skipping hidden conditional questions
     report_items = []
     for item in items:
@@ -158,6 +175,10 @@ def approval_report(request, pk):
                         ans_class = 'answer-no'
                     break
             response = {**response, 'ans_class': ans_class, 'ans_label': ans_label}
+        elif item['type'] == 'date':
+            color_from = item.get('color_from')
+            if color_from and color_from in yn_ans_classes:
+                response = {**response, 'date_ans_class': yn_ans_classes[color_from]}
         report_items.append({**item, 'response': response})
 
     return render(request, 'approval/report.html', {
@@ -201,6 +222,23 @@ def export_docx(request, pk):
             parent_visible = visible.get(cond_on, False)
             parent_answer = response_data.get(cond_on, {}).get('answer', '')
             visible[key] = parent_visible and (parent_answer == cond_val)
+
+    # Pre-compute ans_class for all visible yn items (used to colour date fields)
+    yn_ans_classes = {}
+    for item in items:
+        if item['type'] != 'yn':
+            continue
+        key = item['key']
+        if not visible.get(key, True):
+            continue
+        resp = response_data.get(key, {})
+        answer = resp.get('answer', '')
+        ans_class = 'answer-blank'
+        for opt in item.get('options', []):
+            if opt['value'] == answer:
+                ans_class = 'answer-na' if opt['value'] == 'na' else ('answer-yes' if opt['good'] else 'answer-no')
+                break
+        yn_ans_classes[key] = ans_class
 
     doc = Document()
 
@@ -262,7 +300,18 @@ def export_docx(request, pk):
             comment = response.get('comment', '')
             date_para = doc.add_paragraph(style='List Bullet')
             if date_val:
-                date_para.add_run(date_val).bold = True
+                color_from = item.get('color_from')
+                date_color = None
+                if color_from and color_from in yn_ans_classes:
+                    date_color = {
+                        'answer-yes': _COLOR_GREEN,
+                        'answer-no':  _COLOR_RED,
+                        'answer-na':  _COLOR_GRAY,
+                    }.get(yn_ans_classes[color_from])
+                if date_color:
+                    _add_colored_run(date_para, date_val, date_color, bold=True)
+                else:
+                    date_para.add_run(date_val).bold = True
                 if comment:
                     date_para.add_run(f"  —  {comment}")
             else:

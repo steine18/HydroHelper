@@ -17,11 +17,13 @@ def _yn(key, number, text, conditional_on=None, conditional_value='yes', guidanc
     return item
 
 
-def _date(key, number, text, conditional_on=None, conditional_value='yes'):
+def _date(key, number, text, conditional_on=None, conditional_value='yes', color_from=None):
     item = {'type': 'date', 'key': key, 'number': number, 'text': text}
     if conditional_on:
         item['conditional_on'] = conditional_on
         item['conditional_value'] = conditional_value
+    if color_from:
+        item['color_from'] = color_from
     return item
 
 
@@ -43,7 +45,7 @@ APPROVAL_TYPES = {
             _yn('q1_3', '1.3', 'Has the Station Description been properly updated to reflect any changes that occurred or were made during the analysis period?'),
 
             _section(2, 'Levels'),
-            _date('q2_1', '2.1', 'Date of last levels:'),
+            _date('q2_1', '2.1', 'Date of last levels:', color_from='q2_2'),
             _yn('q2_2', '2.2', 'Are levels overdue?', good_response='no', guidance='If levels are overdue, or determined to be invalid, analysis period should not be approved until levels are run. If levels are overdue and the record is analyzed and then approved, revisions may be required as per established revision criteria. Levels frequency requirements: 1 year for new sites until 3 sets of levels are run; 1 year for new sites with new reference gage installation until 3 sets of levels are run; 1 year for sites where a datum correction was determined from previous levels; 3 years for long-term sites; 5 years for long-term stable sites (there should be documentation of stability).'),
             _yn('q2_3', '2.3', 'Were levels run during the analysis period? (if no, go on to section 3)', good_response='both'),
             _yn('q2_3_1', '2.3.1', 'Were levels done in compliance with T&M 3-A19 (if not, period cannot be approved until a valid set of levels is run as outlined in Appendix E, p. 59)?', conditional_on='q2_3'),
@@ -195,7 +197,7 @@ APPROVAL_TYPES = {
             _section(3, 'Station Level Notes'),
             _yn('q3_1', '3.1', 'Was the date of last visual/manual check of vertical relationship between measuring point and reference marks documented?'),
             _yn('q3_2', '3.2', 'Are levels or reference point inspections overdue? If stable, confirm every 3 to 5 years.', good_response='no'),
-            _date('q3_3', '3.3', 'Date of last station levels:'),
+            _date('q3_3', '3.3', 'Date of last station levels:', color_from='q3_2'),
             _yn('q3_4', '3.4', 'Were levels run during the record period?', good_response='both'),
             _yn('q3_4_1', '3.4.1', 'Have levels data been reviewed for accuracy?', conditional_on='q3_4'),
             _yn('q3_4_2', '3.4.2', 'Have levels been updated in the Historic Levels Summary and Station Description?', conditional_on='q3_4'),

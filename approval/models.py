@@ -40,12 +40,33 @@ class ApprovalRequest(models.Model):
         at = APPROVAL_TYPES_BY_ID.get(self.approval_type)
         if not at:
             return 0
-        questions = [item for item in at['items'] if item['type'] in ('yn', 'date', 'text')]
+        items = at['items']
+        response_data = self.response_data
+
+        # Mirror the conditional visibility logic from the frontend
+        visible = {}
+        for item in items:
+            if item['type'] == 'section':
+                continue
+            key = item['key']
+            cond_on = item.get('conditional_on')
+            if not cond_on:
+                visible[key] = True
+            else:
+                cond_val = item.get('conditional_value', 'yes')
+                parent_visible = visible.get(cond_on, False)
+                parent_answer = response_data.get(cond_on, {}).get('answer', '')
+                visible[key] = parent_visible and (parent_answer == cond_val)
+
+        questions = [
+            item for item in items
+            if item['type'] in ('yn', 'date', 'text') and visible.get(item['key'], False)
+        ]
         if not questions:
             return 0
         answered = 0
         for q in questions:
-            r = self.response_data.get(q['key'], {})
+            r = response_data.get(q['key'], {})
             if q['type'] == 'yn' and r.get('answer'):
                 answered += 1
             elif q['type'] == 'date' and r.get('date'):
