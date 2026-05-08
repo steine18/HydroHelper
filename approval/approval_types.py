@@ -35,6 +35,21 @@ def _section(number, title):
     return {'type': 'section', 'number': number, 'title': title}
 
 
+_UP_TO_DATE_OPTIONS = [
+    {'value': 'up_to_date', 'label': 'Up to date', 'good': True},
+    {'value': 'yes',        'label': 'Yes',         'good': True},
+    {'value': 'no',         'label': 'No',          'good': False},
+    {'value': 'na',         'label': 'N/A',         'good': False},
+]
+
+_NO_CORRECTIONS_OPTIONS = [
+    {'value': 'no_corrections', 'label': 'No corrections', 'good': True},
+    {'value': 'yes',            'label': 'Yes',             'good': True},
+    {'value': 'no',             'label': 'No',              'good': False},
+    {'value': 'na',             'label': 'N/A',             'good': False},
+]
+
+
 APPROVAL_TYPES = {
     'stage_discharge': {
         'label': 'Stage/Discharge',
@@ -42,7 +57,7 @@ APPROVAL_TYPES = {
             _section(1, 'Discharge Measurements, Field Notes, Level Notes, Station Description'),
             _yn('q1_1', '1.1', 'Were discharge measurements, field notes, and level notes adequately reviewed (and corrected, if necessary) and were these reviews documented in accordance with WSC procedures? (if not, this task must be completed before approval)'),
             _yn('q1_2', '1.2', 'Have measurements, field notes, level notes, and other information been properly stored / archived in accordance with WSC procedures?'),
-            _yn('q1_3', '1.3', 'Has the Station Description been properly updated to reflect any changes that occurred or were made during the analysis period?'),
+            _yn('q1_3', '1.3', 'Has the Station Description been properly updated to reflect any changes that occurred or were made during the analysis period?', options=_UP_TO_DATE_OPTIONS),
 
             _section(2, 'Levels'),
             _date('q2_1', '2.1', 'Date of last levels:', color_from='q2_2'),
@@ -122,7 +137,7 @@ APPROVAL_TYPES = {
             _yn('q13_1', '13.1', 'Examine computed daily values for accuracy, completeness and proper use of qualifiers.'),
 
             _section(14, 'Manuscript'),
-            _yn('q14_1', '14.1', 'Have SIMS Manuscript elements been updated as needed?'),
+            _yn('q14_1', '14.1', 'Have SIMS Manuscript elements been updated as needed?', options=_UP_TO_DATE_OPTIONS),
 
             _section(15, 'Approval Summary'),
             _text('q15', '15', 'Provide brief assessment of the analysis period in context of the findings outlined above. Discuss analyst\'s evaluation / quality rating of both stage and computed discharge record and provide your evaluation.'),
@@ -138,7 +153,7 @@ APPROVAL_TYPES = {
             _section(1, 'Field Notes, Calibration Notes, Station Description'),
             _yn('q1_1', '1.1', 'Were field notes, and calibration notes adequately reviewed and were these reviews documented in accordance with WSC procedures? (if not, this task must be completed before approval)'),
             _yn('q1_2', '1.2', 'Have measurements, field notes, level notes, and other information been properly stored / archived in accordance with WSC procedures?'),
-            _yn('q1_3', '1.3', 'Has the Station Description been properly updated to reflect any changes made or observed during analysis period?'),
+            _yn('q1_3', '1.3', 'Has the Station Description been properly updated to reflect any changes made or observed during analysis period?', options=_UP_TO_DATE_OPTIONS),
 
             _section(2, 'Calibrations'),
             _date('q2_1', '2.1', 'Date of last calibration:'),
@@ -168,7 +183,7 @@ APPROVAL_TYPES = {
             _yn('q7_1', '7.1', 'Examine computed daily values for accuracy, completeness and proper use of qualifiers.'),
 
             _section(8, 'Manuscript'),
-            _yn('q8_1', '8.1', 'Have SIMS Manuscript elements been updated as needed?'),
+            _yn('q8_1', '8.1', 'Have SIMS Manuscript elements been updated as needed?', options=_UP_TO_DATE_OPTIONS),
 
             _section(9, 'Approval Evaluation'),
             _text('q9', '9', 'Provide brief assessment of the analysis period in context of the findings outlined above. Discuss analyst\'s evaluation of record and provide your evaluation.'),
@@ -209,19 +224,24 @@ APPROVAL_TYPES = {
             _yn('q3_5_5', '3.5.5', 'Does the application of the correction extend into a period of previously approved data? If so, was the approved period evaluated in accordance with applicable revision criteria?', conditional_on='q3_5'),
 
             _section(4, 'Station Description'),
-            _yn('q4_1', '4.1', 'Was the Station Description updated to reflect any changes that occurred or were made during the record period?'),
+            _yn('q4_1', '4.1', 'Was the Station Description updated to reflect any changes that occurred or were made during the record period?', options=_UP_TO_DATE_OPTIONS),
 
             _section(5, 'Water-Level Edits'),
             _yn('q5_1', '5.1', 'Check instantaneous values for periods of missing data and spikes/anomalies.'),
             _yn('q5_2', '5.2', 'Are thresholds set to adequately manage data spikes or anomalies?'),
 
             _section(6, 'Water-Level Corrections'),
-            _yn('q6_1', '6.1', 'Are water-level corrections reasonable for the site conditions and measurement method limitations?'),
-            _yn('q6_2', '6.2', 'Do applied water-level corrections agree with reasons provided in Station Analysis?'),
-            _yn('q6_3', '6.3', 'Are water-level corrections applied correctly in the database?'),
+            _yn('q6_1', '6.1', 'Are water-level corrections reasonable for the site conditions and measurement method limitations?', options=_NO_CORRECTIONS_OPTIONS),
+            _yn('q6_2', '6.2', 'Do applied water-level corrections agree with reasons provided in Station Analysis?', options=_NO_CORRECTIONS_OPTIONS),
+            _yn('q6_3', '6.3', 'Are water-level corrections applied correctly in the database?', options=_NO_CORRECTIONS_OPTIONS),
 
             _section(7, 'Qualifiers and Other Metadata'),
-            _yn('q7_1', '7.1', 'Are appropriate data qualifiers assigned or otherwise described as expected by use of metadata?'),
+            _yn('q7_1', '7.1', 'Are appropriate data qualifiers assigned or otherwise described as expected by use of metadata?', options=[
+                {'value': 'no_qualifiers', 'label': 'No qualifiers', 'good': True},
+                {'value': 'yes',           'label': 'Yes',           'good': True},
+                {'value': 'no',            'label': 'No',            'good': False},
+                {'value': 'na',            'label': 'N/A',           'good': False},
+            ]),
 
             _section(8, 'Daily Values'),
             _yn('q8_1', '8.1', 'Are partial days adequately labeled and does the time-series software show evidence that they have been reviewed?'),
@@ -231,7 +251,7 @@ APPROVAL_TYPES = {
             _yn('q9_2', '9.2', 'Does the period reviewed look reasonable when compared to the period of record?'),
 
             _section(10, 'Manuscript'),
-            _yn('q10_1', '10.1', 'Have SIMS Manuscript elements been updated as needed?'),
+            _yn('q10_1', '10.1', 'Have SIMS Manuscript elements been updated as needed?', options=_UP_TO_DATE_OPTIONS),
 
             _section(11, 'Approval Summary'),
             _text('q11', '11', 'Provide brief assessment of the record period in context of the findings outlined above. Discuss analyst\'s evaluation and quality of groundwater level record. Add the approval summary to the Approval Comments for the period in RMS.'),
