@@ -147,6 +147,106 @@ APPROVAL_TYPES = {
         ],
     },
 
+    'auto_stage_discharge': {
+        'label': 'Stage/Discharge Auto-Record',
+        'items': [
+            _section(1, 'Discharge Measurements, Field Notes, Level Notes, Station Description'),
+            _yn('q1_1', '1.1', 'Were discharge measurements, field notes, and level notes adequately reviewed (and corrected, if necessary) and were these reviews documented in accordance with WSC procedures? (if not, this task must be completed before approval)'),
+            _yn('q1_2', '1.2', 'Have measurements, field notes, level notes, and other information been properly stored / archived in accordance with WSC procedures?'),
+            _yn('q1_3', '1.3', 'Has the Station Description been properly updated to reflect any changes that occurred or were made during the analysis period?', options=_UP_TO_DATE_OPTIONS),
+
+            _section(2, 'Datum'),
+            _date('q2_1', '2.1', 'Date of last levels:', color_from='q2_2'),
+            _yn('q2_2', '2.2', 'Are levels overdue?', good_response='no',
+                guidance='If levels are overdue, or determined to be invalid, analysis period should not be approved until levels are run. If levels are overdue and the record is analyzed and then approved, revisions may be required as per established revision criteria. Levels frequency requirements: 1 year for new sites until 3 sets of levels are run; 1 year for new sites with new reference gage installation until 3 sets of levels are run; 1 year for sites where a datum correction was determined from previous levels; 3 years for long-term sites; 5 years for long-term stable sites (there should be documentation of stability).'),
+            _yn('q2_3', '2.3', 'Were levels run during the analysis period? (if no, go on to section 3)', good_response='both'),
+            _yn('q2_3_1', '2.3.1', 'Were levels done in compliance with T&M 3-A19 (if not, period cannot be approved until a valid set of levels is run as outlined in Appendix E, p. 59)?', conditional_on='q2_3'),
+            _yn('q2_3_2', '2.3.2', 'Have levels data been updated in the Historic Levels Summary and Station Description, and are those data accurate?', conditional_on='q2_3'),
+            _yn('q2_4', '2.4', 'Was a datum correction of 0.015 ft or more identified? (if no, go on to section 3)', good_response='both'),
+            _yn('q2_4_1', '2.4.1', 'Was datum correction input into proper correction set (Set 1)? (Processing priority: pre)', conditional_on='q2_4'),
+            _yn('q2_4_2', '2.4.2', 'Does the magnitude of the applied correction agree with the difference between gage datum and the reference gage found during levels?', conditional_on='q2_4'),
+            _yn('q2_4_3', '2.4.3', 'Is the presumed cause for the datum correction explained in the station analysis and is the explanation valid?', conditional_on='q2_4'),
+            _yn('q2_4_4', '2.4.4', 'Does application of the correction (prorated or constant) to the time series agree with the presumed cause and explanation provided in the station analysis?', conditional_on='q2_4'),
+            _yn('q2_4_5', '2.4.5', 'Were reference gage readings made during site visits, and gage heights associated with discharge measurements, properly adjusted based upon the datum correction?', conditional_on='q2_4'),
+            _yn('q2_4_6', '2.4.6', 'Does application of the correction extend into a period of previously approved data? If so, was the approved period evaluated in accordance with applicable revision criteria?', conditional_on='q2_4'),
+
+            _section(3, 'Secondary Data Source'),
+            _yn('q3_1', '3.1', 'Were backup data available, downloaded, and used to fill any gaps in transmissions?'),
+            _yn('q3_2', '3.2', 'Were these steps adequately discussed in the station analysis?'),
+
+            _section(4, 'Ice Affected'),
+            _yn('q4_1', '4.1', 'Were periods of ice affected recorded gage heights properly identified and discussed, if present? Approver: evaluate timeseries for potential ice affect.',
+                options=[
+                    {'value': 'no_ice', 'label': 'No Ice', 'good': True},
+                    {'value': 'yes',    'label': 'Yes',    'good': True},
+                    {'value': 'no',     'label': 'No',     'good': False},
+                    {'value': 'na',     'label': 'N/A',    'good': False},
+                ]),
+
+            _section(5, 'Edits'),
+            _yn('q5_1', '5.1', 'Were erroneous recorded gage heights removed? (Processing priority: pre)', good_response='both'),
+            _yn('q5_1_1', '5.1.1', 'Was the basis for removal adequately discussed in the station analysis?', conditional_on='q5_1'),
+
+            _section('5.2', 'Gage-Height Corrections'),
+            _yn('q5_2_1', '5.2.1', 'Do gage-height correction values agree with differences observed between reference gage and recorder? (examine field notes and compare reference gage and recorder readings to defined gage height correction values)'),
+            _yn('q5_2_2', '5.2.2', 'Is the applied timing of each gage height correction valid, and does it agree with the rationale provided in the station analysis? (Processing priority: normal)'),
+            _yn('q5_2_3', '5.2.3', 'Have larger corrections (> 0.03 ft) been adequately discussed? (Note: Blanket statements for small instrument drift can be provided. Larger corrections require detailed discussion.)'),
+            _yn('q5_2_4', '5.2.4', 'Were gage-height corrections properly entered using correction set 2? (Processing priority: normal)'),
+
+            _section('5.3', 'Gaps'),
+            _yn('q5_3_1', '5.3.1', 'Were gaps identified through the auto tool? And were those gaps discussed?'),
+
+            _section('5.4', 'Other Corrections'),
+            _yn('q5_4_1', '5.4.1', 'Were other types of data corrections (flushing, purging, drawdown, etc.) defined and applied during the analysis period? (if no, go on to section 6)', good_response='both'),
+            _yn('q5_4_2', '5.4.2', 'Were flushing or purge corrections defined and applied? (if no, go on to section 5.5)', conditional_on='q5_4_1', good_response='both'),
+            _yn('q5_4_3', '5.4.3', 'Do flushing or purge correction values agree with differences observed between reference gage and recorder both pre- and post-flush / purge? (examine field notes and compare the difference between reference gage and recorder readings to input correction values)', conditional_on='q5_4_2'),
+            _yn('q5_4_4', '5.4.4', 'Is the timing of application of flushing / purge corrections valid and does it agree with the rationale provided in station analysis?', conditional_on='q5_4_2'),
+            _yn('q5_4_5', '5.4.5', 'Were flushing / purge corrections properly entered using correction set 3? (Processing priority: post)', conditional_on='q5_4_2'),
+            _yn('q5_5', '5.5', 'Were drawdown corrections defined and applied? (if no, go on to section 6) (Processing priority: post)', conditional_on='q5_4_1', good_response='both'),
+            _yn('q5_5_1', '5.5.1', 'Was the drawdown correction curve based upon direct observations of the reference gage and recorder over a range of stage consistent with the variable correction applied in the record? (plots of observations should be referenced and archived)', conditional_on='q5_5'),
+            _yn('q5_5_2', '5.5.2', 'Was the basis of the drawdown correction curve adequately discussed in station analysis?', conditional_on='q5_5'),
+            _yn('q5_5_3', '5.5.3', 'Is timing of the applications of drawdown corrections valid and does it agree with the rationale provided in the station analysis? (note: drawdown corrections should be active throughout time period and the relation to stage consistent so long as the orifice configuration associated with drawdown remains the same)', conditional_on='q5_5'),
+            _yn('q5_5_4', '5.5.4', 'Were drawdown corrections properly input using correction set 3? (Processing priority: post)', conditional_on='q5_5'),
+
+            _section(6, 'Stage-Discharge Relation'),
+            _yn('q6_1', '6.1', 'Have all ratings that were active during the analysis period been documented and approved in accordance with WSC procedures? (if not, this task must be completed before approval)'),
+            _yn('q6_2', '6.2', 'Does the active rating represent the current stage-discharge relation as indicated by documented control features and the plotting position of recent measurements made under clear control conditions?'),
+
+            _section(7, 'Shift Curves'),
+            _yn('q7_1', '7.1', 'Are developed shift curves consistent with the shape of the base rating?'),
+            _yn('q7_2', '7.2', 'Are developed shift curves associated with the same control feature consistent with one another (similar hinge and merge gage heights)?'),
+            _yn('q7_3', '7.3', 'Are shift curves applicable to a specific hydraulic control feature sound and are they drawn such that they merge with the base rating at an appropriate gage height (usually in the transition between controls)? If not, has a valid explanation been provided?'),
+            _yn('q7_4', '7.4', 'Have shapes of the shift curves been adequately explained with respect to selected hinge and merge gage heights, and with the hydraulic control?'),
+            _yn('q7_5', '7.5', 'Does the timing of the application of the developed shift curves agree with the interpretation of the cause for the identified shift and has it been adequately explained with respect to the hydrograph?'),
+
+            _section(8, 'Computed Discharge'),
+            _yn('q8_1', '8.1', 'Was the computed discharge discussed? Does the computed discharge record appear reasonable? Are there any odd jumps or drops?'),
+            _yn('q8_1_1', '8.1.1', 'Have recent measurements been made that cover the range of computed discharge for the analysis period?', conditional_on='q8_1'),
+            _yn('q8_2', '8.2', 'Are estimates appropriate, consistent, and developed using adequate methods and with due consideration of all available information? Has that information been documented appropriately?'),
+
+            _section(9, 'Daily Values'),
+            _yn('q9_1', '9.1', 'Examine computed daily values for accuracy, completeness and proper use of qualifiers.'),
+
+            _section(10, 'Hydrographic Comparison'),
+            _yn('q10_1', '10.1', 'Have hydrographic comparisons been adequately made and discussed (regardless of whether any data were estimated)? If no comparison site is available, has a statement to that effect been provided in the analysis?'),
+
+            _section(11, 'Extremes'),
+            _yn('q11_1', '11.1', 'Were peak stage values verified according to the requirements of OSW TM 14.06? Assess validity of reasoning provided.'),
+            _yn('q11_1_1', '11.1.1', 'Was a comparison of the verified peaks for the analysis period to the previous peaks for the water year provided in the station analysis? If analysis period spans the water year boundary, verify the peak stage value for the water year.', conditional_on='q11_1'),
+            _yn('q11_2', '11.2', 'Have maximum computed peak streamflow values been adequately determined?'),
+            _yn('q11_2_1', '11.2.1', 'Was a comparison of the computed peak streamflows for the analysis period to the previous peak streamflows for the water year contained in the station analysis? If analysis period spans the water year boundary, verify the peak streamflow for the water year.', conditional_on='q11_2'),
+
+            _section(12, 'Manuscript'),
+            _yn('q12_1', '12.1', 'Have SIMS Manuscript elements been updated as needed?', options=_UP_TO_DATE_OPTIONS),
+
+            _section(13, 'Approval Summary'),
+            _text('q13', '13.1', 'Provide brief assessment of the analysis period in context of the findings outlined above. Discuss analyst\'s evaluation / quality rating of both stage and computed discharge record and provide your evaluation.'),
+
+            _section(14, 'Operational Follow Up'),
+            _text('q14', '14.1', 'List suggested follow-up such as corrective actions or other needed information, measurements, or observations.'),
+        ],
+    },
+
     'precipitation': {
         'label': 'Precipitation',
         'items': [
