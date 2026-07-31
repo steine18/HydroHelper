@@ -162,7 +162,7 @@ APPROVAL_TYPES = {
             _yn('q2_3', '2.3', 'Were levels run during the analysis period? (if no, go on to section 3)', good_response='both'),
             _yn('q2_3_1', '2.3.1', 'Were levels done in compliance with T&M 3-A19 (if not, period cannot be approved until a valid set of levels is run as outlined in Appendix E, p. 59)?', conditional_on='q2_3'),
             _yn('q2_3_2', '2.3.2', 'Have levels data been updated in the Historic Levels Summary and Station Description, and are those data accurate?', conditional_on='q2_3'),
-            _yn('q2_4', '2.4', 'Was a datum correction of 0.015 ft or more identified? (if no, go on to section 3)', good_response='both'),
+            _yn('q2_4', '2.4', 'Was a datum correction of 0.015 ft or more identified? (if no, go on to section 3)', conditional_on='q2_3', good_response='both'),
             _yn('q2_4_1', '2.4.1', 'Was datum correction input into proper correction set (Set 1)? (Processing priority: pre)', conditional_on='q2_4'),
             _yn('q2_4_2', '2.4.2', 'Does the magnitude of the applied correction agree with the difference between gage datum and the reference gage found during levels?', conditional_on='q2_4'),
             _yn('q2_4_3', '2.4.3', 'Is the presumed cause for the datum correction explained in the station analysis and is the explanation valid?', conditional_on='q2_4'),
