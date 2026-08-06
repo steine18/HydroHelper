@@ -184,20 +184,44 @@ APPROVAL_TYPES = {
                 ]),
 
             _section(5, 'Edits'),
-            _yn('q5_1', '5.1', 'Were erroneous recorded gage heights removed? (Processing priority: pre)', good_response='both'),
+            _yn('q5_1', '5.1', 'Were erroneous recorded gage heights removed? (Processing priority: pre)',
+                options=[
+                    {'value': 'no_removals', 'label': 'No removals needed', 'good': True},
+                    {'value': 'yes',         'label': 'Yes',                'good': True},
+                    {'value': 'no',          'label': 'No',                 'good': False},
+                    {'value': 'na',          'label': 'N/A',                'good': False},
+                ]),
             _yn('q5_1_1', '5.1.1', 'Was the basis for removal adequately discussed in the station analysis?', conditional_on='q5_1'),
 
             _section('5.2', 'Gage-Height Corrections'),
-            _yn('q5_2_1', '5.2.1', 'Do gage-height correction values agree with differences observed between reference gage and recorder? (examine field notes and compare reference gage and recorder readings to defined gage height correction values)'),
+            _yn('q5_2_1', '5.2.1', 'Do gage-height correction values agree with differences observed between reference gage and recorder? (examine field notes and compare reference gage and recorder readings to defined gage height correction values)',
+                options=[
+                    {'value': 'no_corrections', 'label': 'No corrections applied', 'good': True},
+                    {'value': 'yes',            'label': 'Yes',                    'good': True},
+                    {'value': 'no',             'label': 'No',                     'good': False},
+                    {'value': 'na',             'label': 'N/A',                    'good': False},
+                ]),
             _yn('q5_2_2', '5.2.2', 'Is the applied timing of each gage height correction valid, and does it agree with the rationale provided in the station analysis? (Processing priority: normal)'),
             _yn('q5_2_3', '5.2.3', 'Have larger corrections (> 0.03 ft) been adequately discussed? (Note: Blanket statements for small instrument drift can be provided. Larger corrections require detailed discussion.)'),
             _yn('q5_2_4', '5.2.4', 'Were gage-height corrections properly entered using correction set 2? (Processing priority: normal)'),
 
             _section('5.3', 'Gaps'),
-            _yn('q5_3_1', '5.3.1', 'Were gaps identified through the auto tool? And were those gaps discussed?'),
+            _yn('q5_3_1', '5.3.1', 'Were gaps identified through the auto tool? And were those gaps discussed?',
+                options=[
+                    {'value': 'no_gaps', 'label': 'No gaps', 'good': True},
+                    {'value': 'yes',     'label': 'Yes',     'good': True},
+                    {'value': 'no',      'label': 'No',      'good': False},
+                    {'value': 'na',      'label': 'N/A',     'good': False},
+                ]),
 
             _section('5.4', 'Other Corrections'),
-            _yn('q5_4_1', '5.4.1', 'Were other types of data corrections (flushing, purging, drawdown, etc.) defined and applied during the analysis period? (if no, go on to section 6)', good_response='both'),
+            _yn('q5_4_1', '5.4.1', 'Were other types of data corrections (flushing, purging, drawdown, etc.) defined and applied during the analysis period? (if no, go on to section 6)',
+                options=[
+                    {'value': 'no_other', 'label': 'No other corrections', 'good': True},
+                    {'value': 'yes',      'label': 'Yes',                  'good': True},
+                    {'value': 'no',       'label': 'No',                   'good': False},
+                    {'value': 'na',       'label': 'N/A',                  'good': False},
+                ]),
             _yn('q5_4_2', '5.4.2', 'Were flushing or purge corrections defined and applied? (if no, go on to section 5.5)', conditional_on='q5_4_1', good_response='both'),
             _yn('q5_4_3', '5.4.3', 'Do flushing or purge correction values agree with differences observed between reference gage and recorder both pre- and post-flush / purge? (examine field notes and compare the difference between reference gage and recorder readings to input correction values)', conditional_on='q5_4_2'),
             _yn('q5_4_4', '5.4.4', 'Is the timing of application of flushing / purge corrections valid and does it agree with the rationale provided in station analysis?', conditional_on='q5_4_2'),
