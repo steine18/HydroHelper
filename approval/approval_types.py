@@ -263,7 +263,7 @@ APPROVAL_TYPES = {
             _yn('q11_1', '11.1', 'Were peak stage values verified according to the requirements of OSW TM 14.06? Assess validity of reasoning provided.',
                 options=[
                     {'value': 'yes',      'label': 'Yes',      'good': True},
-                    {'value': 'no_peaks', 'label': 'No peaks', 'good': True},
+                    {'value': 'no_peaks', 'label': 'No',       'good': True},
                     {'value': 'no',       'label': 'No',       'good': False},
                     {'value': 'na',       'label': 'N/A',      'good': False},
                 ]),
