@@ -249,13 +249,24 @@ APPROVAL_TYPES = {
             _yn('q8_2', '8.2', 'Are estimates appropriate, consistent, and developed using adequate methods and with due consideration of all available information? Has that information been documented appropriately?'),
 
             _section(9, 'Daily Values'),
-            _yn('q9_1', '9.1', 'Examine computed daily values for accuracy, completeness and proper use of qualifiers.'),
+            _yn('q9_1', '9.1', 'Examine computed daily values for accuracy, completeness and proper use of qualifiers.',
+                options=[
+                    {'value': 'yes', 'label': 'Good', 'good': True},
+                    {'value': 'no',  'label': 'No',   'good': False},
+                    {'value': 'na',  'label': 'N/A',  'good': False},
+                ]),
 
             _section(10, 'Hydrographic Comparison'),
             _yn('q10_1', '10.1', 'Have hydrographic comparisons been adequately made and discussed (regardless of whether any data were estimated)? If no comparison site is available, has a statement to that effect been provided in the analysis?'),
 
             _section(11, 'Extremes'),
-            _yn('q11_1', '11.1', 'Were peak stage values verified according to the requirements of OSW TM 14.06? Assess validity of reasoning provided.'),
+            _yn('q11_1', '11.1', 'Were peak stage values verified according to the requirements of OSW TM 14.06? Assess validity of reasoning provided.',
+                options=[
+                    {'value': 'yes',      'label': 'Yes',      'good': True},
+                    {'value': 'no_peaks', 'label': 'No peaks', 'good': True},
+                    {'value': 'no',       'label': 'No',       'good': False},
+                    {'value': 'na',       'label': 'N/A',      'good': False},
+                ]),
             _yn('q11_1_1', '11.1.1', 'Was a comparison of the verified peaks for the analysis period to the previous peaks for the water year provided in the station analysis? If analysis period spans the water year boundary, verify the peak stage value for the water year.', conditional_on='q11_1'),
             _yn('q11_2', '11.2', 'Have maximum computed peak streamflow values been adequately determined?'),
             _yn('q11_2_1', '11.2.1', 'Was a comparison of the computed peak streamflows for the analysis period to the previous peak streamflows for the water year contained in the station analysis? If analysis period spans the water year boundary, verify the peak streamflow for the water year.', conditional_on='q11_2'),
