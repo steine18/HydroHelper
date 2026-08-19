@@ -231,38 +231,41 @@ def site_data(request, site_no):
     return render(request, "alert2/site_data.html", context)
 
 
-def _build_sensor_rows(locators, interval_hours, offset_minutes, start_dt, end_dt, end_str, now):
-    """Build sensor_rows list for overview — shared between site and group rows."""
+def _build_sensor_rows(locators, start_dt, end_dt, now):
+    """Build sensor_rows list for overview — raw TX counts, no schedule required."""
     sensor_rows = []
+    cutoff_1d  = now - timedelta(hours=24)
+    cutoff_7d  = now - timedelta(days=7)
+    cutoff_30d = now - timedelta(days=30)
     for locator in locators:
         label = locator.label or locator.parameter_type
         row = {
             "label": label,
             "point_locator": locator.point_locator,
-            "summary_1d": None,
-            "summary_7d": None,
-            "summary_30d": None,
+            "count_1d": None,
+            "count_7d": None,
+            "count_30d": None,
             "error": None,
         }
-        if interval_hours:
-            try:
-                data = fetch_point_data(locator.point_locator, start_dt, end_dt + timedelta(days=1))
-                received_set = set()
-                for r in data.get("data", []):
-                    t = _parse_report_time(r["reportTime"])
-                    if t:
-                        received_set.add(t)
-                daily_rows = _compute_daily_stats(
-                    received_set,
-                    start_dt.date(), end_dt.date(),
-                    interval_hours,
-                    offset_minutes,
-                )
-                row["summary_1d"] = _rolling_24h_summary(received_set, now, interval_hours, offset_minutes)
-                row["summary_7d"] = _window_summary(daily_rows, end_str, 7)
-                row["summary_30d"] = _window_summary(daily_rows, end_str, 30)
-            except NovastarAPIError as exc:
-                row["error"] = str(exc)
+        try:
+            data = fetch_point_data(locator.point_locator, start_dt, end_dt + timedelta(days=1))
+            count_1d = count_7d = count_30d = 0
+            for r in data.get("data", []):
+                try:
+                    t = datetime.fromisoformat(r["reportTime"])
+                except (TypeError, ValueError):
+                    continue
+                if t >= cutoff_30d:
+                    count_30d += 1
+                    if t >= cutoff_7d:
+                        count_7d += 1
+                        if t >= cutoff_1d:
+                            count_1d += 1
+            row["count_1d"]  = count_1d
+            row["count_7d"]  = count_7d
+            row["count_30d"] = count_30d
+        except NovastarAPIError as exc:
+            row["error"] = str(exc)
         sensor_rows.append(row)
     return sensor_rows
 
@@ -270,10 +273,8 @@ def _build_sensor_rows(locators, interval_hours, offset_minutes, start_dt, end_d
 @login_required
 def overview(request):
     now = datetime.now(PACIFIC)
-    today_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    end_dt = today_midnight
-    start_dt = end_dt - timedelta(days=30)
-    end_str = now.strftime("%Y-%m-%d")
+    end_dt = now
+    start_dt = now - timedelta(days=30)
 
     # Sites with at least one locator
     sites = (
@@ -295,10 +296,7 @@ def overview(request):
 
     for site in sites:
         locators = list(site.nova_point_locators.order_by("parameter_type"))
-        sensor_rows = _build_sensor_rows(
-            locators, site.transmit_interval_hours, site.transmit_offset_minutes,
-            start_dt, end_dt, end_str, now,
-        )
+        sensor_rows = _build_sensor_rows(locators, start_dt, end_dt, now)
         all_rows.append({
             "display_name": site.site_no,
             "display_subtitle": site.name,
@@ -311,10 +309,7 @@ def overview(request):
 
     for group in groups:
         locators = list(group.nova_point_locators.order_by("parameter_type"))
-        sensor_rows = _build_sensor_rows(
-            locators, group.transmit_interval_hours, group.transmit_offset_minutes,
-            start_dt, end_dt, end_str, now,
-        )
+        sensor_rows = _build_sensor_rows(locators, start_dt, end_dt, now)
         all_rows.append({
             "display_name": group.name,
             "display_subtitle": "",
