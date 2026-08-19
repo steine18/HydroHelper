@@ -3,9 +3,6 @@
 {% block title %}ALERT2 Overview — HydroHelper{% endblock %}
 
 {% block extra_style %}
-.pct-good { color: #198754; font-weight: 600; background-color: rgba(25, 135, 84, 0.12); }
-.pct-warn { color: #fd7e14; font-weight: 600; background-color: rgba(253, 126, 20, 0.12); }
-.pct-bad  { color: #dc3545; font-weight: 600; background-color: rgba(220, 53, 69, 0.12); }
 .site-header { background-color: #e9f5ee; }
 {% endblock %}
 
@@ -17,7 +14,7 @@
 <div class="container-fluid py-3 px-4">
 
   <div class="d-flex align-items-center justify-content-between mb-4">
-    <p class="text-muted small mb-0">7-day and 30-day scheduled transmit receipt rates. Data fetched live.</p>
+    <p class="text-muted small mb-0">Transmission counts for the last 1, 7, and 30 days. Data fetched live.</p>
     <a href="{% url 'alert2_index' %}" class="btn btn-outline-secondary btn-sm">Single Site</a>
   </div>
 
@@ -29,12 +26,9 @@
           <th>Site / Group</th>
           <th>Sensor</th>
           <th>Point ID</th>
-          <th>Schedule</th>
-          <th class="text-end">1-Day</th>
-          <th class="text-end">7-Day</th>
-          <th class="text-end">7-Day Rcvd/Exp</th>
-          <th class="text-end">30-Day</th>
-          <th class="text-end">30-Day Rcvd/Exp</th>
+          <th class="text-end">1-Day TX</th>
+          <th class="text-end">7-Day TX</th>
+          <th class="text-end">30-Day TX</th>
         </tr>
       </thead>
       <tbody>
@@ -51,43 +45,12 @@
             {% endif %}
             <td>{{ sensor.label }}</td>
             <td class="text-muted small">{{ sensor.point_locator }}</td>
-            <td class="text-muted small">
-              {% if row.transmit_interval_hours %}
-                Every {{ row.transmit_interval_hours }}h
-                at :{{ row.transmit_offset_minutes|stringformat:"02d" }}
-              {% else %}
-                <span class="text-warning">Not set</span>
-              {% endif %}
-            </td>
             {% if sensor.error %}
-            <td colspan="5" class="text-danger small">{{ sensor.error }}</td>
-            {% elif sensor.summary_1d %}
-            <td class="text-end
-              {% if sensor.summary_1d.pct >= 90 %}pct-good
-              {% elif sensor.summary_1d.pct >= 70 %}pct-warn
-              {% else %}pct-bad{% endif %}">
-              {{ sensor.summary_1d.pct }}%
-            </td>
-            <td class="text-end
-              {% if sensor.summary_7d.pct >= 90 %}pct-good
-              {% elif sensor.summary_7d.pct >= 70 %}pct-warn
-              {% else %}pct-bad{% endif %}">
-              {{ sensor.summary_7d.pct }}%
-            </td>
-            <td class="text-end text-muted small">
-              {{ sensor.summary_7d.received }}/{{ sensor.summary_7d.expected }}
-            </td>
-            <td class="text-end
-              {% if sensor.summary_30d.pct >= 90 %}pct-good
-              {% elif sensor.summary_30d.pct >= 70 %}pct-warn
-              {% else %}pct-bad{% endif %}">
-              {{ sensor.summary_30d.pct }}%
-            </td>
-            <td class="text-end text-muted small">
-              {{ sensor.summary_30d.received }}/{{ sensor.summary_30d.expected }}
-            </td>
+            <td colspan="3" class="text-danger small">{{ sensor.error }}</td>
             {% else %}
-            <td colspan="5" class="text-muted small">No schedule configured</td>
+            <td class="text-end">{{ sensor.count_1d }}</td>
+            <td class="text-end">{{ sensor.count_7d }}</td>
+            <td class="text-end">{{ sensor.count_30d }}</td>
             {% endif %}
           </tr>
           {% endfor %}
